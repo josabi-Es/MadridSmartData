@@ -34,7 +34,7 @@ env.bak/
 # Ignore everything in data/
 data/*
 
-src/visualitaion/
+src/visualization/
 
 # But do not ignore the README.md
 !data/README.md

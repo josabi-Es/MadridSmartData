@@ -3,6 +3,7 @@
 
 ##Folder Structure
 
+```
 data/
 ├── raw/
 │   ├── air_quality_data/        # Daily air quality records since 2001
@@ -14,7 +15,7 @@ data/
 │   ├── air_quality_processed/   # Air quality data after preprocessing (Parquet)
 │   ├── traffic_data_processed/  # Traffic data after preprocessing (Parquet)
 │   └── districts/               # District boundaries (GeoJSON, unchanged)
-
+```
 
 ### 1. Download the data from the official sources:
 

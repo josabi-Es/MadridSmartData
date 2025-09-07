@@ -1,7 +1,7 @@
 
 ## Instructions
 
-##Folder Structure
+## Folder Structure
 
 ```
 data/

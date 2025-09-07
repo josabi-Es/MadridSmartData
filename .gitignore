@@ -28,7 +28,6 @@ env.bak/
 # ---- Docker ----
 # Local .env files
 .env
-.env.*
 !.env.example
 
 # Ignore everything in data/

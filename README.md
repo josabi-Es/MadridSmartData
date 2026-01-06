@@ -43,55 +43,23 @@ Jupyter notebooks for rapid visualization and exploratory analysis. They help to
 
 ## III. Workflow Overview
 
-The data flow in this project can be understood as follows:
+```mermaid
+graph LR
+    %% Nodos con nombres técnicos del proyecto
+    A[Portal Madrid] --> B{ingest}
+    B --> C[(Raw Data)]
+    C --> D{ETL Process}
+    D --> E[(Processed Data)]
+    E --> F[Gradio App]
 
-                             ┌────────────────────────────┐
-                             │  Open Data Madrid Portal   │
-                             │   (Source of all datasets) │
-                             └────────────────────────────┘
-                                            │
-                                        Fetch CSVs         
-                                            │
-                                            ▼
-                             ┌────────────────────────────┐
-                             │           ingest           │
-                             │        (CSV → Parquet)     │
-                             └────────────────────────────┘
-                                            │
-                                            ▼
-                             ┌────────────────────────────┐
-                             │       Raw Data Folders     │
-                             │----------------------------│
-                             │  air_quality/              │
-                             │  air_quality_sensors/      │
-                             │  traffic_data/             │
-                             │  traffic_sensors/          │
-                             └────────────────────────────┘
-                                           │
-                                      Visualization 
-                                           │
-                                           ▼
-                             ┌──────────────────────────────┐
-                             │    Preprocessing & Cleaning  │
-                             └──────────────────────────────┘
-                                           │
-                                           ▼
-                             ┌────────────────────────────┐
-                             │       Processed Data       │
-                             │----------------------------│
-                             │ air_quality_processed/     │
-                             │ traffic_data_processed/    │
-                             │ districts/                 │
-                             └────────────────────────────┘
-                                           │
-                              Visualize through Gradio App 
-                                           │
-                                           ▼
-                             ┌────────────────────────────┐
-                             │         interface          │
-                             │      (Gradio App)          │
-                             └────────────────────────────┘
-
+    %% Estilos técnicos (Colores por estado de dato)
+    style A fill:#cfd8dc,stroke:#546e7a
+    style B fill:#fff9c4,stroke:#fbc02d
+    style C fill:#ffe0b2,stroke:#fb8c00
+    style D fill:#c8e6c9,stroke:#388e3c
+    style E fill:#bbdefb,stroke:#1e88e5
+    style F fill:#f8bbd0,stroke:#c2185b
+```
 
 
 ## IV. Technologies Used

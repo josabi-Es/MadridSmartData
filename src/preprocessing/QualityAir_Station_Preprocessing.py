@@ -1,17 +1,26 @@
 import logging
+import os
 from functools import reduce
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import (
-    col, lit, lpad, to_date, concat_ws, when, isnan,
-    avg, median, first, expr
-)
-from pyspark.sql.types import StructType, StructField, IntegerType, StringType,DoubleType
-from pyspark.sql import Window
-
 
 # --- Configuración de paths (ajusta según tu entorno) ---
 from dotenv import load_dotenv
-import os
+from pyspark.sql import SparkSession, Window
+from pyspark.sql.functions import (
+    avg,
+    col,
+    concat_ws,
+    lit,
+    lpad,
+    to_date,
+    when,
+)
+from pyspark.sql.types import (
+    DoubleType,
+    IntegerType,
+    StringType,
+    StructField,
+    StructType,
+)
 
 load_dotenv()
 

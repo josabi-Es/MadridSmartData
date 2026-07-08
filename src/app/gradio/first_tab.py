@@ -1,9 +1,9 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, avg, trunc
-import pandas as pd
+import os
+
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
-import os
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import avg, col, trunc
 
 load_dotenv()
 

@@ -1,5 +1,12 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.types import (StructType, StructField, IntegerType, StringType, DoubleType, TimestampType)
+from pyspark.sql.types import (
+    DoubleType,
+    IntegerType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
 
 """
 This script reads a CSV file containing contamination data using a predefined schema,

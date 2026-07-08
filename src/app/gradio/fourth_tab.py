@@ -1,9 +1,7 @@
-from pyspark.sql.functions import col, to_date, hour, avg
-import pandas as pd
 import matplotlib.pyplot as plt
-from pyspark.sql.functions import col, to_date, hour, avg
 import pandas as pd
-import matplotlib.pyplot as plt
+from pyspark.sql.functions import avg, col, hour, to_date
+
 
 def plot_tendencia_temporal(df_poll, df_trafico, estaciones_distrito_df, gas, variable_trafico, distrito):
     # --- Read CSV of stations with districts ---

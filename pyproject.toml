@@ -1,15 +1,42 @@
 [project]
-name = "code"
+name = "madridsmartdata"
 version = "0.1.0"
-description = "Add your description here"
+description = "Madrid open data pipeline: air quality + traffic, ingest to forecasting"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "dotenv>=0.9.9",
+    "duckdb>=1.0.0",
     "folium>=0.20.0",
     "geopandas==1.0.1",
     "gradio==4.44.1",
     "matplotlib==3.9.4",
     "pyspark==3.4.4",
+    "requests>=2.31.0",
+    "scikit-learn>=1.5.0",
     "shapely==2.0.7",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "ruff>=0.6.0",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N"]
+
+# Legacy Spark code, replaced by src/data/{ingest,transform} in a later phase.
+[tool.ruff.lint.per-file-ignores]
+"src/ingest/**" = ["E501", "N802", "N806", "N816"]
+"src/preprocessing/**" = ["E501", "N802", "N806", "N816"]
+# Gradio tabs, untouched until Spark/HDFS is removed (phase 3).
+"src/app/gradio/**" = ["E501"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

@@ -1,19 +1,28 @@
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
-from pyspark.sql.functions import (
-    col, when, hour, to_date, month, dayofmonth, year, avg, minute, second
-)
-from pyspark.sql.types import (
-    StructType, StructField, IntegerType, StringType, DoubleType, TimestampType
-)
-from pyspark.sql import Window
 import logging
+import os
 from datetime import datetime
-import geopandas as gpd
-from shapely.geometry import Point
 
 from dotenv import load_dotenv
-import os
+from pyspark.sql import SparkSession, Window
+from pyspark.sql.functions import (
+    avg,
+    col,
+    dayofmonth,
+    hour,
+    minute,
+    month,
+    second,
+    when,
+    year,
+)
+from pyspark.sql.types import (
+    DoubleType,
+    IntegerType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
 
 # Load environment variables
 load_dotenv()

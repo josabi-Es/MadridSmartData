@@ -29,7 +29,7 @@ Contains input datasets, mainly in CSV or Parquet format. This is where all the 
 
 Scripts for reading CSV files, converting them to Parquet, and uploading data to HDFS. These scripts are executed manually and help organize the raw data into a format suitable for big data processing.
 
-#### 3. src/interface/
+#### 3. src/app/gradio/
 
 Contains the Gradio application. It has four tabs where users can explore different insights about traffic and pollution data interactively.
 
@@ -132,13 +132,13 @@ Before running the application, you need to set up the environment variables in 
 
 - Preprocessing: The raw datasets are intended to be used with Spark and Hadoop. Follow the instructions in `src/preprocessing.py` to process the raw data and generate the cleaned datasets.
 
-- Set environment variables in interface.py: Open `src/interface` and follow its instructions pf `README.md` to properly configure the `.env file.` Ensure that all paths point to the processed datasets generated in the preprocessing step.
+- Set environment variables in interface.py: Open `src/app/gradio` and follow its instructions pf `README.md` to properly configure the `.env file.` Ensure that all paths point to the processed datasets generated in the preprocessing step.
 
 Once these steps are complete, proceed to the next step in the workflow.
 
 5. Run the application locally
 ```
-python src/interface/interface.py
+python src/app/gradio/interface.py
 ```
 
 This will launch a local Gradio interface with four tabs, each displaying different traffic and pollution insights.

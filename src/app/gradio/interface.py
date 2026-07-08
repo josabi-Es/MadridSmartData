@@ -1,11 +1,19 @@
+
 import gradio as gr
-from first_tab import iniciar_spark, cargar_datos, obtener_estaciones, obtener_magnitudes, graficar_serie_temporal
-from second_tab import graficar_serie_trafico , cargar_datos_trafico
-from third_tab import generar_mapa_html
-import os
-import certifi
-from third_tab import generar_mapa_html, generar_estaciones_distrito, generar_leyenda_html 
+from first_tab import (
+    cargar_datos,
+    graficar_serie_temporal,
+    iniciar_spark,
+    obtener_estaciones,
+    obtener_magnitudes,
+)
 from fourth_tab import plot_tendencia_temporal
+from second_tab import cargar_datos_trafico, graficar_serie_trafico
+from third_tab import (
+    generar_estaciones_distrito,
+    generar_leyenda_html,
+    generar_mapa_html,
+)
 
 # Initialize Spark only once
 spark = iniciar_spark()

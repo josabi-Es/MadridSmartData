@@ -1,7 +1,8 @@
-from pyspark.sql.functions import col, trunc, avg
+import os
+
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
-import os
+from pyspark.sql.functions import avg, col, trunc
 
 # Load variables from .env
 load_dotenv()

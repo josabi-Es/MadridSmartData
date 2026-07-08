@@ -1,6 +1,13 @@
-from pyspark.sql import SparkSession
 import os
-from ReadCSV import schema_PosTraffic, schema_traffic , schema_Contamination, schema_ContaminationStation, schema_Contamination_v2  # noqa: F401
+
+from pyspark.sql import SparkSession
+from ReadCSV import (  # noqa: F401
+    schema_Contamination,
+    schema_Contamination_v2,
+    schema_ContaminationStation,
+    schema_PosTraffic,
+    schema_traffic,
+)
 
 """
 This script reads all CSV files in a directory organized by year,

@@ -1,5 +1,6 @@
-from pyspark.sql import SparkSession
 from pathlib import Path
+
+from pyspark.sql import SparkSession
 
 """
 This script reads monthly parquet files from a base folder,

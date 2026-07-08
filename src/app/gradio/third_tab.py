@@ -1,11 +1,12 @@
+import os
+
+import folium
 import geopandas as gpd
 import pandas as pd
-import folium
-import os
-from shapely.geometry import Point
-from pyspark.sql.functions import year, month, avg
 from dotenv import load_dotenv
-from first_tab import iniciar_spark, cargar_datos
+from first_tab import cargar_datos, iniciar_spark
+from pyspark.sql.functions import avg, month, year
+from shapely.geometry import Point
 
 load_dotenv()
 
@@ -129,7 +130,7 @@ def generar_leyenda_html(gas):
             label = f"{min_val}+"
         else:
             label = f"{min_val} - {max_val}"
-        html += f"<li style='margin:4px 0; display:flex; align-items:center;'>"
+        html += "<li style='margin:4px 0; display:flex; align-items:center;'>"
         html += f"<span style='display:inline-block;width:20px;height:20px;background:{color};margin-right:10px;border:1px solid black;'></span>{label}</li>"
     html += "</ul></div>"
     return html

@@ -54,3 +54,8 @@ tmp/
 # Ignore Docker Compose override files
 docker-compose.override.yml
 docker-compose.override.*
+
+# Claude
+.claude/
+CLAUDE.md
+spec/

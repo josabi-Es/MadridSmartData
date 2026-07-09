@@ -6,54 +6,10 @@ This project analyzes traffic and pollution data from Madrid open data. It provi
 a **Gradio interface with four interactive tabs** to explore air quality and traffic
 insights, and it is being rebuilt into a reproducible pipeline: API ingestion →
 Parquet + DuckDB → forecasting comparison. Full detail lives in `spec/` (mission,
-tech stack, roadmap, one folder per feature); this README tracks progress phase by
-phase and how to verify each one locally.
+tech stack, roadmap, one folder per feature). Current status and next steps are
+tracked in `CLAUDE.md`, not here.
 
-## II. Progress by phase
-
-Full roadmap: `spec/constitution/roadmap.md`. Each phase below states what you can
-run locally to confirm it works before the next one starts.
-
-### ✅ Phase 0 — Reorganize `src/`, add ruff/pytest tooling
-
-`src/interface/` moved to `src/app/gradio/` unchanged; added `src/core`,
-`src/data/{ingest,transform,access}`, `src/ml` skeleton per
-`spec/features/000-reorganizacion`.
-
-```bash
-uv sync
-uv run ruff check .
-uv run pytest
-```
-
-### ✅ Phase 1 — Catalog discovery (Madrid Open Data CKAN API)
-
-Confirmed the real `dataset_id` for air quality, traffic, and districts against
-the live API. Findings: `spec/features/001-descubrimiento-catalago/findings.md`.
-
-```bash
-# list all resources for one dataset, one year — avoids pulling the whole catalog
-uv run python src/data/ingest/catalog_probe.py --dataset aire_diario --year 2024
-
-# also preview the first rows of the matching CSV
-uv run python src/data/ingest/catalog_probe.py --dataset aire_diario --year 2024 --preview
-```
-
-### ⏳ Phase 2 — API ingestion (pending)
-
-Replace manual CSV downloads with a CKAN-based ingestor writing partitioned
-Parquet. Spec: `spec/features/002-ingesta-api-madrid`.
-
-### ⏳ Phase 3 — Drop Spark/HDFS, read via DuckDB (pending)
-
-`src/app/gradio/` stops depending on a running HDFS/Spark session. Spec:
-`spec/features/003-simplificacion-infra`.
-
-### ⏳ Phase 4 — Forecasting comparison (pending)
-
-### ⏳ Phase 5 — Forecast exposure (pending)
-
-## III. Repository structure
+## II. Repository structure
 
 ```text
 MadridSmartData/
@@ -67,12 +23,12 @@ MadridSmartData/
 │   │   └── access/             # DuckDB queries                           (phase 3)
 │   ├── ml/                     # forecasting: features, models, evaluation (phase 4)
 │   ├── app/gradio/             # Gradio UI — entry point
-│   ├── ingest/                 # legacy manual CSV→Parquet scripts, retired in phase 2
-│   └── preprocessing/          # legacy Spark ETL, retired in phase 2/3
+│   ├── old_ingest/             # legacy manual CSV→Parquet scripts, deleted in phase 2
+│   └── old_preprocessing/      # legacy Spark ETL, deleted in phase 2/3
 └── tests/                      # mirrors src/
 ```
 
-## IV. Technologies
+## III. Technologies
 
 - Python 3.11+
 - Gradio → interactive UI
@@ -82,7 +38,7 @@ MadridSmartData/
   being dropped
 - scikit-learn → forecasting models (phase 4)
 
-## V. Setup
+## IV. Setup
 
 1. Clone the repository
 ```bash
@@ -104,7 +60,7 @@ source .venv/bin/activate  # or .venv/Scripts/activate on Windows
 python src/app/gradio/interface.py
 ```
 
-## VI. Gradio Results
+## V. Gradio Results
 
 Example insights available in the current interface:
 

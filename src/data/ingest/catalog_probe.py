@@ -21,6 +21,7 @@ DATASETS = {
     "aire_diario": "201410-0-calidad-aire-diario",
     "estaciones_aire": "212629-0-estaciones-control-aire",
     "trafico_historico": "208627-0-transporte-ptomedida-historico",
+    "trafico_puntos_medida": "202468-0-intensidad-trafico",
 }
 
 

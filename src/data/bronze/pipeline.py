@@ -64,11 +64,9 @@ def csv_to_parquet(
     con = duckdb.connect()
     con.install_extension("httpfs")
     con.load_extension("httpfs")
-    read_args = f"'{csv_source}', sep=';'"
+    read_args = f"'{csv_source}', sep=';', encoding='UTF-8', allow_quoted_nulls=true"
     if types:
         read_args += f", types={types!r}"
-    if encoding:
-        read_args += f", encoding={encoding!r}"
     select = f"SELECT * FROM read_csv_auto({read_args})"
     con.execute(f"COPY ({select}) TO '{out_path}' (FORMAT PARQUET)")
     return con.execute(f"SELECT count(*) FROM '{out_path}'").fetchone()[0]
@@ -160,16 +158,14 @@ def ingest_snapshot(dataset: str, out_dir: str) -> int:
     return row_count
 
 
-def ingest_month_snapshot(
-    dataset: str, month: str, out_dir: str, encoding: str | None = None
-) -> int:
+def ingest_month_snapshot(dataset: str, month: str, out_dir: str) -> int:
     """Ingest one month of a monthly-snapshot, direct-CSV dataset (sensor locations)."""
     resources = fetch_with_retry(lambda: fetch_resources(dataset))
     resource = select_resource(resources, month_to_description(month))
 
     out_path = Path(out_dir) / f"{month}.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    row_count = csv_to_parquet(resource["url"], str(out_path), encoding=encoding)
+    row_count = csv_to_parquet(resource["url"], str(out_path))
 
     append_manifest(
         str(Path(out_dir) / "manifest.json"),
@@ -240,7 +236,7 @@ if __name__ == "__main__":
         n = ingest_traffic_month(args.years, out_dir, work_dir=f"{out_dir}/_tmp")
         out_file = f"{args.years}.parquet"
     elif args.dataset == "trafico_puntos_medida":
-        n = ingest_month_snapshot(args.dataset, args.years, out_dir, encoding="latin-1")
+        n = ingest_month_snapshot(args.dataset, args.years, out_dir)
         out_file = f"{args.years}.parquet"
     else:
         n = ingest_year(args.dataset, args.years, out_dir)

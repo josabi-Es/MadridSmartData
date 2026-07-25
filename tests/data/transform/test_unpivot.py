@@ -39,6 +39,17 @@ def test_unpivot_air_quality_keeps_one_row_per_real_calendar_day(tmp_path):
     assert rows[1][4] == "N"
 
 
+def test_unpivot_air_quality_maps_magnitud_code_to_label(tmp_path):
+    bronze_path = tmp_path / "bronze.parquet"
+    _write_bronze_fixture(bronze_path)
+    out_path = tmp_path / "long.parquet"
+
+    unpivot_air_quality(str(bronze_path), str(out_path))
+
+    magnitud = duckdb.sql(f"SELECT DISTINCT magnitud FROM '{out_path}'").fetchone()
+    assert magnitud == ("NO2",)
+
+
 def test_unpivot_air_quality_drops_day_that_does_not_exist_in_month(tmp_path):
     bronze_path = tmp_path / "bronze.parquet"
     _write_bronze_fixture(bronze_path)

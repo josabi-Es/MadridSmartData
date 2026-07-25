@@ -1,0 +1,111 @@
+"""DuckDB read-only queries over processed Parquet, replacing the Spark reads."""
+
+import duckdb
+
+
+def get_traffic_districts(points_path: str) -> list[int]:
+    """Sorted distinct district ids from the traffic sensor locations."""
+    query = f"SELECT DISTINCT distrito FROM '{points_path}' ORDER BY distrito"
+    return [r[0] for r in duckdb.sql(query).fetchall()]
+
+
+def get_stations(path: str) -> list[str]:
+    """Distinct station ids, sorted, as strings (matches the old Spark UI contract)."""
+    rows = duckdb.sql(
+        f"SELECT DISTINCT estacion FROM '{path}' ORDER BY estacion"
+    ).fetchall()
+    return [str(r[0]) for r in rows]
+
+
+def get_magnitudes(path: str, estacion_id: str | None = None) -> list[str]:
+    """Distinct magnitudes, optionally filtered to one station."""
+    where = f"WHERE estacion = {int(estacion_id)}" if estacion_id else ""
+    query = f"SELECT DISTINCT magnitud FROM '{path}' {where} ORDER BY magnitud"
+    return [r[0] for r in duckdb.sql(query).fetchall()]
+
+
+def monthly_average(
+    path: str, estacion_id: str, magnitud: str
+) -> list[tuple[str, float]]:
+    """Monthly average of `dato` for one station/magnitud, valid readings only."""
+    query = f"""
+        SELECT date_trunc('month', fecha) AS mes, avg(dato) AS media
+        FROM '{path}'
+        WHERE estacion = {int(estacion_id)}
+          AND magnitud = '{magnitud}'
+          AND validez = 'V'
+        GROUP BY mes
+        ORDER BY mes
+    """
+    return duckdb.sql(query).fetchall()
+
+
+TRAFFIC_VARIABLES = {"intensidad", "ocupacion", "carga", "vmed"}
+
+
+def monthly_average_traffic(
+    path: str, id_trafico: str, variable: str
+) -> list[tuple[str, float]]:
+    """Monthly average of a traffic variable for one sensor id, error='N' only."""
+    if variable not in TRAFFIC_VARIABLES:
+        raise ValueError(f"unknown traffic variable: {variable!r}")
+    query = f"""
+        SELECT date_trunc('month', fecha) AS mes, avg({variable}) AS media
+        FROM '{path}'
+        WHERE id = {int(id_trafico)} AND error = 'N'
+        GROUP BY mes
+        ORDER BY mes
+    """
+    return duckdb.sql(query).fetchall()
+
+
+def district_monthly_average(
+    air_path: str, stations_path: str, gas: str, anio: int, mes: int
+) -> list[tuple[str, float]]:
+    """Average of `gas` per district for one year/month, joined on station id."""
+    query = f"""
+        SELECT s.COD_DIS, avg(a.dato) AS valor_medio
+        FROM '{air_path}' a
+        JOIN '{stations_path}' s ON a.estacion = s.CODIGO_CORTO
+        WHERE a.magnitud = '{gas}'
+          AND a.validez = 'V'
+          AND extract(year FROM a.fecha) = {int(anio)}
+          AND extract(month FROM a.fecha) = {int(mes)}
+        GROUP BY s.COD_DIS
+        ORDER BY s.COD_DIS
+    """
+    return duckdb.sql(query).fetchall()
+
+
+def daily_average_air_by_district(
+    air_path: str, stations_path: str, gas: str, distrito: str
+) -> list[tuple]:
+    """Daily average of `gas` for one district, joined on station id."""
+    query = f"""
+        SELECT CAST(a.fecha AS DATE) AS dia, avg(a.dato) AS media
+        FROM '{air_path}' a
+        JOIN '{stations_path}' s ON a.estacion = s.CODIGO_CORTO
+        WHERE a.magnitud = '{gas}' AND a.validez = 'V' AND s.COD_DIS = '{distrito}'
+        GROUP BY dia
+        ORDER BY dia
+    """
+    return duckdb.sql(query).fetchall()
+
+
+def daily_average_traffic_by_district(
+    traffic_path: str, points_path: str, variable: str, distrito: str
+) -> list[tuple]:
+    """Daily average (noon reading only) of a traffic variable for one district."""
+    if variable not in TRAFFIC_VARIABLES:
+        raise ValueError(f"unknown traffic variable: {variable!r}")
+    query = f"""
+        SELECT CAST(t.fecha AS DATE) AS dia, avg(t.{variable}) AS media
+        FROM '{traffic_path}' t
+        JOIN '{points_path}' p ON t.id = p.id
+        WHERE t.error = 'N'
+          AND EXTRACT(hour FROM t.fecha) = 12
+          AND CAST(p.distrito AS VARCHAR) = '{distrito}'
+        GROUP BY dia
+        ORDER BY dia
+    """
+    return duckdb.sql(query).fetchall()

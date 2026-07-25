@@ -1,38 +1,42 @@
+import os
+
 import matplotlib.pyplot as plt
 import pandas as pd
-from pyspark.sql.functions import avg, col, hour, to_date
+from dotenv import load_dotenv
+
+from src.data.access.queries import (
+    daily_average_air_by_district,
+    daily_average_traffic_by_district,
+)
+
+load_dotenv()
+
+AIRQUALITY_PATH = os.getenv("DATA_AIRQUALITY_PATH", "data/processed/aire/*.parquet")
+TRAFFIC_PATH = os.getenv("DATA_TRAFFIC_PATH", "data/processed/trafico/*.parquet")
+ESTACIONES_DISTRITO_PATH = os.getenv(
+    "ESTACIONES_DISTRITO_PATH", "data/processed/estaciones_aire/latest.parquet"
+)
+TRAFFIC_POINTS_PATH = os.getenv(
+    "TRAFFIC_POINTS_PATH", "data/bronze/trafico_puntos_medida/*.parquet"
+)
 
 
-def plot_tendencia_temporal(df_poll, df_trafico, estaciones_distrito_df, gas, variable_trafico, distrito):
-    # --- Read CSV of stations with districts ---
-    estaciones_distrito_df["COD_DIS"] = estaciones_distrito_df["COD_DIS"].astype(str).apply(lambda x: x.zfill(2))
-    estaciones_spark = df_poll.sparkSession.createDataFrame(estaciones_distrito_df)
-
-     # --- Pollution data ---
-    df_poll = (
-        df_poll
-        .filter(col("validez") == "V")
-        .join(estaciones_spark, on="estacion", how="inner")
-        .filter((col("magnitud") == gas) & (col("COD_DIS") == distrito))
-        .withColumn("fecha_dia", to_date("fecha"))
+def plot_tendencia_temporal(gas, variable_trafico, distrito):
+    poll_rows = daily_average_air_by_district(
+        AIRQUALITY_PATH, ESTACIONES_DISTRITO_PATH, gas, distrito
     )
-    df_poll_agg = df_poll.groupBy("fecha_dia").agg(avg("dato").alias("media_gas"))
+    df_poll = pd.DataFrame(poll_rows, columns=["fecha_dia", "media_gas"])
 
-    # --- Traffic data ---
-    df_trafico = (
-        df_trafico
-        .filter((col("error") == "N") & (col("distrito") == int(distrito)))
-        .filter(hour("fecha") == 12)
-        .withColumn("fecha_dia", to_date("fecha"))
+    trafico_rows = daily_average_traffic_by_district(
+        TRAFFIC_PATH, TRAFFIC_POINTS_PATH, variable_trafico, distrito
     )
-    df_trafico_agg = df_trafico.groupBy("fecha_dia").agg(avg(variable_trafico).alias("media_trafico"))
+    df_trafico = pd.DataFrame(trafico_rows, columns=["fecha_dia", "media_trafico"])
 
-    # --- Join datasets ---
-    df_joined = df_poll_agg.join(df_trafico_agg, on="fecha_dia", how="inner").toPandas()
+    df_joined = df_poll.merge(df_trafico, on="fecha_dia", how="inner")
     df_joined["fecha_dia"] = pd.to_datetime(df_joined["fecha_dia"])
     df_joined = df_joined.sort_values("fecha_dia")
 
-     # --- Common range: according to the shorter dataset (traffic) ---
+    # --- Common range: according to the shorter dataset (traffic) ---
     min_fecha = pd.to_datetime("2019-01-01")
     max_fecha = pd.to_datetime("2025-03-31")
     df_joined = df_joined[(df_joined["fecha_dia"] >= min_fecha) & (df_joined["fecha_dia"] <= max_fecha)]

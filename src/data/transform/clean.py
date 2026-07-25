@@ -8,6 +8,13 @@ from shapely.geometry import Point
 
 TRAFFIC_METRICS = ["intensidad", "ocupacion", "carga", "vmed"]
 
+# Official magnitud codes, per the station structure doc (212629-2 PDF).
+MAGNITUD_LABELS = {
+    1: "SO2", 6: "CO", 7: "NO", 8: "NO2", 9: "PM2.5", 10: "PM10",
+    12: "NOx", 14: "O3", 20: "TOL", 30: "BEN", 35: "EBE", 42: "TCH", 43: "CH4",
+    44: "NMHC",
+}  # fmt: skip
+
 
 def clean_traffic(bronze_path: str, out_path: str) -> None:
     """Turn negative sentinel values into NULL for the 4 traffic metrics.
@@ -35,9 +42,13 @@ def unpivot_air_quality(bronze_path: str, out_path: str) -> None:
     NULL in the source -- they're padded with dato=0.0, validez='N'. The
     only reliable filter is the real calendar: day <= last day of ANO/MES.
     """
+    magnitud_case = "CASE MAGNITUD " + " ".join(
+        f"WHEN {code} THEN '{label}'" for code, label in MAGNITUD_LABELS.items()
+    ) + " ELSE CAST(MAGNITUD AS VARCHAR) END"
+
     days = [
         f"""
-        SELECT ESTACION AS estacion, MAGNITUD AS magnitud,
+        SELECT ESTACION AS estacion, {magnitud_case} AS magnitud,
                MAKE_DATE(CAST(ANO AS INTEGER), CAST(MES AS INTEGER), {d}) AS fecha,
                D{d:02d} AS dato, V{d:02d} AS validez
         FROM '{bronze_path}'

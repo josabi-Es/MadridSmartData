@@ -2,40 +2,25 @@ import os
 
 import matplotlib.pyplot as plt
 from dotenv import load_dotenv
-from pyspark.sql.functions import avg, col, trunc
 
-# Load variables from .env
+from src.data.access.queries import monthly_average_traffic
+
 load_dotenv()
-DATA_TRAFFIC_PATH = os.getenv("DATA_TRAFFIC_PATH", "data/processed/traffic_processed")
+DATA_TRAFFIC_PATH = os.getenv("DATA_TRAFFIC_PATH", "data/processed/trafico/*.parquet")
 
-def cargar_datos_trafico(spark):
-    df_trafico = spark.read.parquet(f"{DATA_TRAFFIC_PATH}/*")
-    return df_trafico
 
-def graficar_serie_trafico(df, id_trafico, variable):
+def graficar_serie_trafico(id_trafico, variable):
     try:
-        id_trafico = int(id_trafico)
+        int(id_trafico)
     except ValueError:
-        raise ValueError("El ID debe ser un número entero válido")
+        raise ValueError("El ID debe ser un número entero válido") from None
 
-    # Basic filtering
-    df_filtrado = df.filter(
-        (col("id") == id_trafico) &
-        (col("error") == "N")
-    )
+    rows = monthly_average_traffic(DATA_TRAFFIC_PATH, id_trafico, variable)
+    meses = [r[0] for r in rows]
+    medias = [r[1] for r in rows]
 
-    # Truncate date by month to reduce density (change to "day" for daily detail)
-    df_mes = df_filtrado.withColumn("mes", trunc("fecha", "month"))
-
-    # Monthly average of the variable
-    df_agrupado = df_mes.groupBy("id", "mes").agg(avg(variable).alias("media"))
-
-    # Convert to Pandas
-    pdf = df_agrupado.orderBy("mes").toPandas()
-
-    # Plot with matplotlib
     fig, ax = plt.subplots(figsize=(14, 6))
-    ax.plot(pdf["mes"], pdf["media"], marker='o', linestyle='-', color='g')
+    ax.plot(meses, medias, marker="o", linestyle="-", color="g")
     ax.set_title(f"Evolución mensual de {variable} - ID {id_trafico}")
     ax.set_xlabel("Mes")
     ax.set_ylabel(f"Valor medio de {variable}")

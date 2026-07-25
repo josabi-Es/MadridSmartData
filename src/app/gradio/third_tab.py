@@ -4,9 +4,8 @@ import folium
 import geopandas as gpd
 import pandas as pd
 from dotenv import load_dotenv
-from first_tab import cargar_datos, iniciar_spark
-from pyspark.sql.functions import avg, month, year
-from shapely.geometry import Point
+
+from src.data.access.queries import district_monthly_average
 
 load_dotenv()
 
@@ -19,33 +18,11 @@ GAS_TRAMOS = {
     "NOx":   [(0, 50, "green"), (50, 100, "yellow"), (100, 150, "orange"), (150, float("inf"), "red")]
 }
 
-DISTRITOS_PATH = os.getenv("DISTRITOS_PATH", "data/processed/districts/Distritos_geo.json")
-ESTACIONES_CSV = os.getenv("ESTACIONES_CSV", "data/processed/districts/estaciones_distrito.csv")
-
-def generar_estaciones_distrito(df_cont):
-    if os.path.exists(ESTACIONES_CSV):
-        df = pd.read_csv(ESTACIONES_CSV, dtype={"COD_DIS": str})
-        df["COD_DIS"] = df["COD_DIS"].str.zfill(2)
-        return df
-
-    print("📍 Generando 'estaciones_distrito.csv'...")
-
-    estaciones_df = df_cont.select("estacion", "latitud", "longitud").distinct().toPandas()
-    estaciones_df["geometry"] = estaciones_df.apply(lambda row: Point(row["longitud"], row["latitud"]), axis=1)
-    estaciones_gdf = gpd.GeoDataFrame(estaciones_df, geometry="geometry", crs="EPSG:4326")
-
-    distritos = gpd.read_file(DISTRITOS_PATH)
-    if distritos.crs != estaciones_gdf.crs:
-        distritos = distritos.to_crs(estaciones_gdf.crs)
-
-    distritos["COD_DIS"] = distritos["COD_DIS"].astype(str).str.zfill(2)
-
-    estaciones_con_distrito = gpd.sjoin(estaciones_gdf, distritos, how="left", predicate="within")
-    resultado = estaciones_con_distrito[["estacion", "COD_DIS"]].drop_duplicates()
-    resultado["COD_DIS"] = resultado["COD_DIS"].astype(str).str.zfill(2)
-
-    resultado.to_csv(ESTACIONES_CSV, index=False)
-    return resultado
+DISTRITOS_PATH = os.getenv("DISTRITOS_PATH", "data/bronze/distritos/latest.parquet")
+AIRQUALITY_PATH = os.getenv("DATA_AIRQUALITY_PATH", "data/processed/aire/*.parquet")
+ESTACIONES_DISTRITO_PATH = os.getenv(
+    "ESTACIONES_DISTRITO_PATH", "data/processed/estaciones_aire/latest.parquet"
+)
 
 
 def obtener_color(valor, gas):
@@ -55,49 +32,15 @@ def obtener_color(valor, gas):
     return "gray"
 
 
-def calcular_media_por_distrito(df_cont, estaciones_distrito_df, gas, anio, mes):
-    # Asegurar formato de COD_DIS
-    estaciones_distrito_df["COD_DIS"] = estaciones_distrito_df["COD_DIS"].astype(str).str.zfill(2)
-    estaciones_spark = df_cont.sql_ctx.createDataFrame(estaciones_distrito_df)
-
-    # Primero añadimos las columnas "anio" y "mes"
-    df_temp = (
-        df_cont
-        .withColumn("anio", year(df_cont.fecha))
-        .withColumn("mes", month(df_cont.fecha))
-    )
-
-    # Luego filtramos usando esas columnas
-    df_filtrado = (
-        df_temp
-        .filter((df_temp.magnitud == gas) & (df_temp.anio == anio) & (df_temp.mes == mes))
-    )
-
-    # Hacemos join con las estaciones con distrito
-    df_con_distrito = df_filtrado.join(estaciones_spark, on="estacion", how="inner")
-
-    # Calculamos la media por distrito
-    df_resultado = (
-        df_con_distrito
-        .groupBy("COD_DIS")
-        .agg(avg("dato").alias("valor_medio"))
-        .toPandas()
-    )
-
-    # Normalizamos el código de distrito a dos dígitos
-    df_resultado["COD_DIS"] = df_resultado["COD_DIS"].astype(str).str.zfill(2)
-    return df_resultado
-
-
 def generar_mapa_html(gas, anio, mes):
-    distritos = gpd.read_file(DISTRITOS_PATH)
+    distritos = gpd.read_parquet(DISTRITOS_PATH).to_crs("EPSG:4326")
     distritos["COD_DIS"] = distritos["COD_DIS"].astype(str).str.zfill(2)
-    
-    spark= iniciar_spark()
-    df_cont = cargar_datos(spark)
 
-    estaciones_distrito_df = generar_estaciones_distrito(df_cont)
-    df_valores = calcular_media_por_distrito(df_cont, estaciones_distrito_df, gas, anio, mes)
+    valores = district_monthly_average(
+        AIRQUALITY_PATH, ESTACIONES_DISTRITO_PATH, gas, anio, mes
+    )
+    df_valores = pd.DataFrame(valores, columns=["COD_DIS", "valor_medio"])
+    df_valores["COD_DIS"] = df_valores["COD_DIS"].astype(str).str.zfill(2)
 
     distritos = distritos.merge(df_valores, on="COD_DIS", how="left")
 

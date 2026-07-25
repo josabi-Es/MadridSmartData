@@ -12,19 +12,14 @@ services:
       PYTHONPATH: /opt/repo
       AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER:-admin}
       AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
-      INGEST_YEAR: ${INGEST_YEAR:-2024}
-      INGEST_MONTH: ${INGEST_MONTH:-12}
     volumes:
+      - airflow_home:/opt/airflow
       - .:/opt/repo
       - ./airflow/dags:/opt/airflow/dags
-    # `airflow standalone` always randomizes its own admin password,
-    # ignoring _AIRFLOW_WWW_USER_* entirely (confirmed reading its source:
-    # FabAirflowSecurityManagerOverride.create_admin_standalone() hardcodes
-    # a random one). So: init the DB, create the fixed admin ourselves
-    # first (`|| true` -- a re-run against an existing DB would error
-    # "already exists", harmless), then hand off to standalone -- it sees
-    # the user already exists and leaves the password alone.
     command: >
       bash -c "airflow db init &&
       (airflow users create --username $$AIRFLOW_ADMIN_USER --password $$AIRFLOW_ADMIN_PASSWORD --firstname Air --lastname Flow --role Admin --email admin@example.com || true) &&
       airflow standalone"
+
+volumes:
+  airflow_home:

@@ -23,4 +23,9 @@ def clean_traffic(bronze_path: str, out_path: str) -> None:
     columns = [clip(c) for c in all_columns]
     query = f"SELECT {', '.join(columns)} FROM '{bronze_path}'"
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    # Traffic is 15-min resolution across ~4,700 sensors -- a month can be
+    # 10M+ rows. duckdb defaults to one thread per core, which spikes RAM
+    # hard in memory-constrained containers (hit an OOM in the Airflow
+    # container). Cap it here rather than tuning the container's memory.
+    duckdb.sql("SET threads=2; SET memory_limit='1GB';")
     duckdb.sql(f"COPY ({query}) TO '{out_path}' (FORMAT PARQUET)")

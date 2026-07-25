@@ -4,9 +4,9 @@ Lists resources (URL, format, datastore availability) per dataset_id, so we
 can decide the download strategy before writing the real ingestor.
 
 Examples:
-    uv run python src/data/ingest/catalog_probe.py
-    uv run python src/data/ingest/catalog_probe.py --dataset aire_diario --year 2024
-    uv run python src/data/ingest/catalog_probe.py \
+    uv run python src/data/bronze/catalog_probe.py
+    uv run python src/data/bronze/catalog_probe.py --dataset aire_diario --year 2024
+    uv run python src/data/bronze/catalog_probe.py \
         --dataset aire_diario --year 2024 --preview
 """
 

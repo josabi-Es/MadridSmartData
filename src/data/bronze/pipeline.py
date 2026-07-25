@@ -12,7 +12,7 @@ import duckdb
 import geopandas as gpd
 import requests
 
-from src.data.ingest.ckan import fetch_resources
+from src.data.bronze.ckan import fetch_resources
 
 T = TypeVar("T")
 
@@ -90,9 +90,23 @@ def extract_first_file(zip_path: str, dest_dir: str) -> str:
 
 
 def append_manifest(manifest_path: str, entry: dict) -> None:
-    """Append one entry to the JSON manifest, creating it if missing."""
+    """Upsert one entry into the JSON manifest, creating it if missing.
+
+    Re-ingesting the same year/month overwrites its manifest entry instead
+    of piling up duplicate log lines -- the parquet itself already gets
+    overwritten per year/month file, the manifest should match. Snapshot
+    entries (no year/month, e.g. distritos/estaciones_aire) have no key to
+    dedupe on, so a re-run just replaces the single existing entry.
+    """
     path = Path(manifest_path)
     entries = json.loads(path.read_text()) if path.exists() else []
+
+    key = "year" if "year" in entry else "month" if "month" in entry else None
+    if key is not None:
+        entries = [e for e in entries if e.get(key) != entry[key]]
+    else:
+        entries = []
+
     entries.append(entry)
     path.write_text(json.dumps(entries, indent=2))
 

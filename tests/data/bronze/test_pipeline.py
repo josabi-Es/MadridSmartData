@@ -8,7 +8,7 @@ import pytest
 import requests
 from shapely.geometry import Point
 
-from src.data.ingest.pipeline import (
+from src.data.bronze.pipeline import (
     append_manifest,
     csv_to_parquet,
     extract_first_file,
@@ -38,6 +38,54 @@ def test_select_resource_raises_when_no_match():
 
     with pytest.raises(ValueError, match="2024"):
         select_resource(resources, year="2024", fmt="CSV")
+
+
+def test_append_manifest_replaces_entry_with_same_year(tmp_path):
+    manifest_path = tmp_path / "manifest.json"
+    append_manifest(str(manifest_path), {"year": "2024", "resource": "r1", "rows": 10})
+
+    append_manifest(str(manifest_path), {"year": "2024", "resource": "r2", "rows": 20})
+
+    entries = json.loads(manifest_path.read_text())
+    assert len(entries) == 1
+    assert entries[0] == {"year": "2024", "resource": "r2", "rows": 20}
+
+
+def test_append_manifest_keeps_entries_for_different_years(tmp_path):
+    manifest_path = tmp_path / "manifest.json"
+    append_manifest(str(manifest_path), {"year": "2024", "resource": "r1", "rows": 10})
+
+    append_manifest(str(manifest_path), {"year": "2025", "resource": "r2", "rows": 20})
+
+    entries = json.loads(manifest_path.read_text())
+    assert len(entries) == 2
+    assert {e["year"] for e in entries} == {"2024", "2025"}
+
+
+def test_append_manifest_replaces_entry_with_same_month(tmp_path):
+    manifest_path = tmp_path / "manifest.json"
+    append_manifest(
+        str(manifest_path), {"month": "2024-01", "resource": "r1", "rows": 10}
+    )
+
+    append_manifest(
+        str(manifest_path), {"month": "2024-01", "resource": "r2", "rows": 20}
+    )
+
+    entries = json.loads(manifest_path.read_text())
+    assert len(entries) == 1
+    assert entries[0]["resource"] == "r2"
+
+
+def test_append_manifest_replaces_snapshot_entry_with_no_year_or_month(tmp_path):
+    manifest_path = tmp_path / "manifest.json"
+    append_manifest(str(manifest_path), {"resource": "r1", "rows": 10})
+
+    append_manifest(str(manifest_path), {"resource": "r2", "rows": 20})
+
+    entries = json.loads(manifest_path.read_text())
+    assert len(entries) == 1
+    assert entries[0]["resource"] == "r2"
 
 
 def test_csv_to_parquet_forces_types_over_nan_literal(tmp_path):
@@ -164,7 +212,7 @@ def _fake_zip_bytes() -> bytes:
 
 
 def test_ingest_traffic_month_cleans_up_work_dir(tmp_path, monkeypatch):
-    from src.data.ingest import pipeline
+    from src.data.bronze import pipeline
 
     resource = {
         "name": "208627-x-zip",

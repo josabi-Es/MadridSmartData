@@ -23,9 +23,9 @@ from src.ml.models.sklearn_models import (
 
 load_dotenv()
 
-AIRQUALITY_PATH = os.getenv("DATA_AIRQUALITY_PATH", "data/processed/aire/*.parquet")
-TRAFFIC_PATH = os.getenv("DATA_TRAFFIC_PATH", "data/processed/trafico/*.parquet")
-MODELS_DIR = os.getenv("ML_MODELS_DIR", "data/models")
+AIRQUALITY_PATH = os.getenv("DATA_AIRQUALITY_PATH", "data/silver/aire/*.parquet")
+TRAFFIC_PATH = os.getenv("DATA_TRAFFIC_PATH", "data/silver/trafico/*.parquet")
+MODELS_DIR = os.getenv("ML_MODELS_DIR", "data/gold")
 
 MODEL_CLASSES = [
     NaiveModel, DecisionTreeModel, RandomForestModel, XGBoostModel, MLPModel
@@ -60,11 +60,17 @@ def _train_and_save(
     winner = winner_cls()
     winner.fit(df[feature_cols], df[target_col])
 
+    # Flat "ml_<variable>_<year>*" naming (no subfolders): each retrain with
+    # more history lands in its own file instead of silently overwriting
+    # last year's artifact, and the tab always resolves the latest one.
+    year = int(df["fecha"].max().year)
+    stem = f"ml_{variable}_{year}"
+
     Path(MODELS_DIR).mkdir(parents=True, exist_ok=True)
-    out_path = Path(MODELS_DIR) / f"{variable}.joblib"
+    out_path = Path(MODELS_DIR) / f"{stem}.joblib"
     joblib.dump(winner, out_path)
 
-    metrics_path = Path(MODELS_DIR) / f"{variable}_metrics.json"
+    metrics_path = Path(MODELS_DIR) / f"{stem}_metrics.json"
     metrics_path.write_text(
         json.dumps(
             {"winner": winner_name, "comparison": comparison.to_dict("records")}
@@ -74,7 +80,7 @@ def _train_and_save(
     holdout = last_fold_predictions(
         winner_cls(), df, target_col, feature_cols, partition_col
     )
-    holdout.to_parquet(Path(MODELS_DIR) / f"{variable}_holdout.parquet")
+    holdout.to_parquet(Path(MODELS_DIR) / f"{stem}_holdout.parquet")
 
     return comparison, winner_name, out_path
 

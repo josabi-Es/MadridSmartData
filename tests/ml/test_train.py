@@ -37,9 +37,24 @@ def test_train_and_save_writes_a_loadable_model(tmp_path, monkeypatch):
     )
 
     assert winner_name in comparison["model"].to_numpy()
+    assert out_path.name == "ml_NO2_2024.joblib"
     assert out_path.exists()
     loaded = joblib.load(out_path)
     assert loaded.name == winner_name
+
+
+def test_train_and_save_names_files_with_the_data_year(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.ml.train.MODELS_DIR", str(tmp_path))
+    df = _toy_df()
+    df["fecha"] = pd.date_range("2025-01-01", periods=len(df))
+
+    _, _, out_path = _train_and_save(
+        "NO2", df, "dato", FEATURE_COLS, partition_col="estacion"
+    )
+
+    assert out_path.name == "ml_NO2_2025.joblib"
+    assert (tmp_path / "ml_NO2_2025_metrics.json").exists()
+    assert (tmp_path / "ml_NO2_2025_holdout.parquet").exists()
 
 
 def test_train_and_save_winner_is_refit_on_full_data(tmp_path, monkeypatch):
@@ -62,7 +77,7 @@ def test_train_and_save_writes_metrics_json(tmp_path, monkeypatch):
         "NO2", _toy_df(), "dato", FEATURE_COLS, partition_col="estacion"
     )
 
-    metrics_path = tmp_path / "NO2_metrics.json"
+    metrics_path = tmp_path / "ml_NO2_2024_metrics.json"
     assert metrics_path.exists()
     saved = json.loads(metrics_path.read_text())
     assert saved["winner"] == winner_name
@@ -76,7 +91,7 @@ def test_train_and_save_writes_holdout_parquet(tmp_path, monkeypatch):
         "NO2", _toy_df(), "dato", FEATURE_COLS, partition_col="estacion"
     )
 
-    holdout_path = tmp_path / "NO2_holdout.parquet"
+    holdout_path = tmp_path / "ml_NO2_2024_holdout.parquet"
     assert holdout_path.exists()
     holdout = pd.read_parquet(holdout_path)
     assert list(holdout.columns) == ["fecha", "estacion", "actual", "predicted"]

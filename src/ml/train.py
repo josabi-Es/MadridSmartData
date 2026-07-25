@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 
 from src.ml.evaluate import last_fold_predictions, walk_forward_evaluate
 from src.ml.features import build_air_features, build_traffic_features
+from src.ml.forecast import recursive_forecast
 from src.ml.models.sklearn_models import (
     DecisionTreeModel,
     MLPModel,
@@ -23,8 +24,8 @@ from src.ml.models.sklearn_models import (
 
 load_dotenv()
 
-AIRQUALITY_PATH = os.getenv("DATA_AIRQUALITY_PATH", "data/silver/aire/*.parquet")
-TRAFFIC_PATH = os.getenv("DATA_TRAFFIC_PATH", "data/silver/trafico/*.parquet")
+AIRQUALITY_PATH = os.getenv("DATA_AIRQUALITY_PATH", "data/silver/aire/all.parquet")
+TRAFFIC_PATH = os.getenv("DATA_TRAFFIC_PATH", "data/silver/trafico/all.parquet")
 MODELS_DIR = os.getenv("ML_MODELS_DIR", "data/gold")
 
 MODEL_CLASSES = [
@@ -37,6 +38,8 @@ TRAFFIC_FEATURE_COLS = ["id", *CALENDAR_COLS]
 
 AIR_VARIABLES = ["NO2", "PM10", "PM2.5"]
 TRAFFIC_VARIABLES = ["intensidad"]
+
+FORECAST_HORIZON = 365
 
 
 def _train_and_save(
@@ -81,6 +84,11 @@ def _train_and_save(
         winner_cls(), df, target_col, feature_cols, partition_col
     )
     holdout.to_parquet(Path(MODELS_DIR) / f"{stem}_holdout.parquet")
+
+    future = recursive_forecast(
+        winner, df, target_col, feature_cols, partition_col, horizon=FORECAST_HORIZON
+    )
+    future.to_parquet(Path(MODELS_DIR) / f"{stem}_future.parquet")
 
     return comparison, winner_name, out_path
 

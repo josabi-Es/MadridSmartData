@@ -55,6 +55,7 @@ def test_train_and_save_names_files_with_the_data_year(tmp_path, monkeypatch):
     assert out_path.name == "ml_NO2_2025.joblib"
     assert (tmp_path / "ml_NO2_2025_metrics.json").exists()
     assert (tmp_path / "ml_NO2_2025_holdout.parquet").exists()
+    assert (tmp_path / "ml_NO2_2025_future.parquet").exists()
 
 
 def test_train_and_save_winner_is_refit_on_full_data(tmp_path, monkeypatch):
@@ -96,3 +97,20 @@ def test_train_and_save_writes_holdout_parquet(tmp_path, monkeypatch):
     holdout = pd.read_parquet(holdout_path)
     assert list(holdout.columns) == ["fecha", "estacion", "actual", "predicted"]
     assert len(holdout) > 0
+
+
+def test_train_and_save_writes_future_forecast_parquet(tmp_path, monkeypatch):
+    monkeypatch.setattr("src.ml.train.MODELS_DIR", str(tmp_path))
+    monkeypatch.setattr("src.ml.train.FORECAST_HORIZON", 5)
+    df = _toy_df()
+
+    _train_and_save(
+        "NO2", df, "dato", FEATURE_COLS, partition_col="estacion"
+    )
+
+    future_path = tmp_path / "ml_NO2_2024_future.parquet"
+    assert future_path.exists()
+    future = pd.read_parquet(future_path)
+    assert list(future.columns) == ["fecha", "estacion", "predicted"]
+    assert len(future) == 5 * df["estacion"].nunique()
+    assert future["fecha"].min() > df["fecha"].max()

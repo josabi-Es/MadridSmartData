@@ -5,35 +5,16 @@ This project uses .env files to configure paths for your data. Follow these step
 ```
 cp .env.template .env
 ```
-2. Edit the .env file and set the paths to your processed data files. For example:
 
-- Local files: Set the paths to the files you generated during preprocessing.
+2. Edit the .env file if your Parquet lives somewhere other than `data/bronze/`
+   and `data/processed/` (see the ingestion pipeline in `src/data/ingest/` and
+   cleaning in `src/data/transform/`).
 
-- HDFS files: Set the HDFS URI where you stored your processed data.
+3. Run the app:
 
-3. Place your processed files in the preprocessing folder or the appropriate path, and update .env with their location.
+```
+python -m src.app.gradio.interface
+```
 
-**Data Flow & Folder Structure**
-
-
-                ┌────────────────────────────┐
-                │       Processed Data       │
-                │----------------------------│
-                │ POLLUTION_PROCESSED_PATH   │
-                │ TRAFFIC_PROCESSED_PATH     │
-                │ DISTRITOS_FILTERED_PATH    │
-                └────────────────────────────┘
-                            │
-                            ▼
-               ┌────────────────────────────┐
-               │          Interface         │
-               │----------------------------│
-               │           Gradio           │
-               │ (User Interaction / GUI)   │
-               └────────────────────────────┘
-                            │
-                            ▼
-               ┌────────────────────────────┐
-               │        Visualization       │
-               │ (Plots, Maps, Time Series) │
-               └────────────────────────────┘
+No Spark, no HDFS -- everything reads local Parquet through DuckDB
+(`src/data/access/queries.py`), plus `geopandas` for the district map.

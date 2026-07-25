@@ -22,9 +22,9 @@ MadridSmartData/
 │   │   ├── transform/          # cleaning, CSV → Parquet                   (phase 2)
 │   │   └── access/             # DuckDB queries                           (phase 3)
 │   ├── ml/                     # forecasting: features, models, evaluation (phase 4)
-│   ├── app/gradio/             # Gradio UI — entry point
-│   ├── old_ingest/             # legacy manual CSV→Parquet scripts, deleted in phase 2
-│   └── old_preprocessing/      # legacy Spark ETL, deleted in phase 2/3
+│   ├── app/gradio/             # Gradio UI — entry point, no Spark/HDFS
+│   ├── old_ingest/             # legacy manual CSV→Parquet scripts, kept locally only
+│   └── old_preprocessing/      # legacy Spark ETL, kept locally only
 └── tests/                      # mirrors src/
 ```
 
@@ -32,11 +32,12 @@ MadridSmartData/
 
 - Python 3.11+
 - Gradio → interactive UI
-- DuckDB → SQL over local Parquet, no server (replaces Spark/HDFS as of phase 3)
-- PySpark & HDFS → still used by `src/ingest/` and `src/preprocessing/` until
-  phases 2-3 retire them; see `spec/constitution/tech-stack.md` for why they're
-  being dropped
+- DuckDB → SQL over local Parquet, no server
+- geopandas → district shapefile + spatial join
 - scikit-learn → forecasting models (phase 4)
+
+No Spark, no HDFS — see `spec/constitution/tech-stack.md` for why they were
+dropped.
 
 ## IV. Setup
 
@@ -54,10 +55,10 @@ uv sync
 ```bash
 source .venv/bin/activate  # or .venv/Scripts/activate on Windows
 ```
-4. Run the Gradio app (currently still requires a local HDFS/Spark setup —
-   see `src/app/gradio/README.md` and phase 3 above for when that goes away)
+4. Run the Gradio app (reads local Parquet, see `src/app/gradio/README.md`
+   for the expected `data/bronze/` and `data/processed/` paths)
 ```bash
-python src/app/gradio/interface.py
+python -m src.app.gradio.interface
 ```
 
 ## V. Gradio Results

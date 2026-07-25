@@ -1,19 +1,27 @@
 """Real vs. predicted (held-out fold) for the fase-4 winner model. No retraining here."""
 
 import json
-import os
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
-from dotenv import load_dotenv
 
-load_dotenv()
+MODELS_DIR = "data/gold"
 
-MODELS_DIR = os.getenv("ML_MODELS_DIR", "data/models")
+
+def _latest_year(variable):
+    """Newest year available for `variable`, so a retrain with more history
+    never gets shadowed by an older path hardcoded somewhere."""
+    years = [
+        int(p.stem.removeprefix(f"ml_{variable}_").removesuffix("_holdout"))
+        for p in Path(MODELS_DIR).glob(f"ml_{variable}_*_holdout.parquet")
+    ]
+    return max(years)
 
 
 def _holdout(variable):
-    df = pd.read_parquet(f"{MODELS_DIR}/{variable}_holdout.parquet")
+    stem = f"ml_{variable}_{_latest_year(variable)}"
+    df = pd.read_parquet(Path(MODELS_DIR) / f"{stem}_holdout.parquet")
     partition_col = next(
         c for c in df.columns if c not in ("fecha", "actual", "predicted")
     )
@@ -43,7 +51,8 @@ def graficar_prediccion(variable, estacion_id):
 
 
 def metricas_texto(variable):
-    with open(f"{MODELS_DIR}/{variable}_metrics.json", encoding="utf-8") as f:
+    stem = f"ml_{variable}_{_latest_year(variable)}"
+    with open(Path(MODELS_DIR) / f"{stem}_metrics.json", encoding="utf-8") as f:
         data = json.load(f)
     winner = data["winner"]
     row = next(r for r in data["comparison"] if r["model"] == winner)

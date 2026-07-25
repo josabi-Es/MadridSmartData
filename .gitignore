@@ -63,6 +63,7 @@ docker-compose.override.*
 .claude/
 CLAUDE.md
 spec/
+spec.md
 
 # Auxiliary files
 summary.md

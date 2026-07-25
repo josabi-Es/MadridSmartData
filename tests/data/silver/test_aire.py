@@ -2,7 +2,7 @@ import datetime
 
 import duckdb
 
-from src.data.transform.clean import unpivot_air_quality
+from src.data.silver.aire import unpivot_air_quality
 
 
 def _write_bronze_fixture(path):

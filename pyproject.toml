@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "dotenv>=0.9.9",
-    "duckdb>=1.0.0",
+    "duckdb>=1.5.0",
     "folium>=0.20.0",
     "geopandas==1.0.1",
     "fastapi<0.116",
@@ -38,8 +38,8 @@ select = ["E", "F", "I", "N"]
 [tool.ruff.lint.per-file-ignores]
 "src/old_ingest/**" = ["E501", "N802", "N806", "N816"]
 "src/old_preprocessing/**" = ["E501", "N802", "N806", "N816"]
-# Gradio tabs: long lines from UI literals (color tables, folium markup).
-"src/app/gradio/**" = ["E501"]
+# Dashboard: long lines from UI literals (color tables, folium markup).
+"src/dashboard/**" = ["E501"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

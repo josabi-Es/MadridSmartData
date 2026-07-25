@@ -1,6 +1,6 @@
 # Madrid Smart Data
 
-Traffic & air quality analytics for Madrid open data — ingest → clean →
+Traffic & air quality analytics for Madrid open data: ingest → clean →
 forecast → dashboard, orchestrated by Airflow.
 
 <div align="center">
@@ -20,15 +20,15 @@ forecast → dashboard, orchestrated by Airflow.
 ## Where the data comes from
 
 [Madrid Open Data](https://datos.madrid.es) is the city council's public
-data portal — free datasets (traffic, air quality, districts...) anyone
+data portal, free datasets (traffic, air quality, districts...) anyone
 can query, no login needed. It's served through **CKAN**, a standard
 open-data API: one call (`package_show?id=<dataset>`) returns the
 resource list for a dataset, then each resource is just a downloadable
 CSV/file. `src/data/bronze/ckan.py` does exactly that call, one dataset
 id per source (air, stations, traffic...).
 
-That raw pull lands in **DuckDB + Parquet** — no database server, just
-files queried directly with SQL — following the **Medallion**
+That raw pull lands in **DuckDB + Parquet**, no database server, just
+files queried directly with SQL, following the **Medallion**
 architecture: `bronze/` (raw, as CKAN gave it), `silver/` (cleaned),
 `gold/` (final tables + trained models), each stage only reading the one
 before it.
@@ -44,14 +44,14 @@ Two services, two ports:
 
 | Port | Service | What it's for |
 |---|---|---|
-| **7860** | `dashboard` (Gradio) | See the result — the visualizer, already reading whatever data is in `data/` |
+| **7860** | `dashboard` (Gradio) | See the result: the visualizer, already reading whatever data is in `data/` |
 | **8081** | `airflow` (`admin`/`admin`, from `.env`) | Trigger ingestion and retraining |
 
 Trigger sequence in the Airflow UI (`Trigger DAG w/ config`):
 
-1. **`daily_ingest`** first — pulls a year/month from the CKAN API into
+1. **`daily_ingest`** first: pulls a year/month from the CKAN API into
    `bronze/`, then runs `src/data/run_pipeline.py` (silver → gold dims/facts).
-2. **`train_forecast`** after, only once there's data — retrains the
+2. **`train_forecast`** after, only once there's data: retrains the
    forecasting models onto `gold/`.
 
 ![airflow](docs/airflow.png)
@@ -60,23 +60,14 @@ Trigger sequence in the Airflow UI (`Trigger DAG w/ config`):
 
 ```bash
 cp .env.template .env
+uv venv
+uv sync
 uv run python -m src.dashboard.interface
 ```
 
-`uv run` installs whatever's missing and runs it in one step — no manual
-`venv`, no `activate`. It only installs what the visualizer actually
-imports, nothing like `requests`/`scikit-learn`/`xgboost`. Opens at
-http://localhost:7860.
-
-New to `uv`? `uv sync` installs the dependencies into `.venv/` first if
-you'd rather do it in two steps.
-
-If you also want to run ingestion or retraining locally (not on
-Airflow): `uv run --extra pipeline python -m src.ml.train`.
-
 ## CI/CD
 
-Not yet — coming soon.
+Not yet, coming soon.
 
 ---
 

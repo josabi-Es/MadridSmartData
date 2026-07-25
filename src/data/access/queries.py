@@ -100,6 +100,40 @@ def district_monthly_average(
     return duckdb.sql(query).fetchall()
 
 
+def get_air_variables_by_district(
+    air_path: str, stations_path: str, distrito: str
+) -> list[str]:
+    """Gases with at least one valid reading in this district's stations.
+
+    Some districts' station(s) don't measure every gas -- without this,
+    picking e.g. PM2.5 in a district that only tracks NO2/O3 just shows an
+    empty chart with no explanation.
+    """
+    query = f"""
+        SELECT DISTINCT a.magnitud
+        FROM '{air_path}' a
+        JOIN '{stations_path}' s ON a.estacion = s.CODIGO_CORTO
+        WHERE a.validez = 'V' AND s.COD_DIS = '{distrito}'
+        ORDER BY a.magnitud
+    """
+    return [r[0] for r in duckdb.sql(query).fetchall()]
+
+
+def daily_traffic_series(path: str, id_trafico: str, variable: str) -> list[tuple]:
+    """Real daily series (day, value) for one traffic sensor, aggregated like
+    `src/ml/features.py::build_traffic_features` (raw readings are 15-min)."""
+    if variable not in TRAFFIC_VARIABLES:
+        raise ValueError(f"unknown traffic variable: {variable!r}")
+    query = f"""
+        SELECT CAST(fecha AS DATE) AS dia, avg({variable}) AS valor
+        FROM '{path}'
+        WHERE id = {int(id_trafico)} AND error = 'N'
+        GROUP BY dia
+        ORDER BY dia
+    """
+    return duckdb.sql(query).fetchall()
+
+
 def daily_average_air_by_district(
     air_path: str, stations_path: str, gas: str, distrito: str
 ) -> list[tuple]:

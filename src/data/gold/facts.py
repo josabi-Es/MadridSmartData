@@ -16,8 +16,10 @@ from src.utils.logger_config import logger
 
 load_dotenv()
 
-SILVER_AIR_PATH = os.getenv("SILVER_AIR_PATH", "data/silver/aire/*.parquet")
-SILVER_TRAFFIC_PATH = os.getenv("SILVER_TRAFFIC_PATH", "data/silver/trafico/*.parquet")
+SILVER_AIR_PATH = os.getenv("SILVER_AIR_PATH", "data/silver/aire/all.parquet")
+SILVER_TRAFFIC_PATH = os.getenv(
+    "SILVER_TRAFFIC_PATH", "data/silver/trafico/all.parquet"
+)
 GOLD_DIR = os.getenv("GOLD_DIR", "data/gold")
 
 

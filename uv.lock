@@ -736,12 +736,16 @@ dependencies = [
     { name = "geopandas" },
     { name = "gradio" },
     { name = "huggingface-hub" },
-    { name = "joblib" },
     { name = "matplotlib" },
     { name = "pyarrow" },
+    { name = "shapely" },
+]
+
+[package.optional-dependencies]
+pipeline = [
+    { name = "joblib" },
     { name = "requests" },
     { name = "scikit-learn" },
-    { name = "shapely" },
     { name = "xgboost", version = "3.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "xgboost", version = "3.3.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
 ]
@@ -761,14 +765,15 @@ requires-dist = [
     { name = "geopandas", specifier = "==1.0.1" },
     { name = "gradio", specifier = "==4.44.1" },
     { name = "huggingface-hub", specifier = "<1.0" },
-    { name = "joblib", specifier = ">=1.5.3" },
+    { name = "joblib", marker = "extra == 'pipeline'", specifier = ">=1.5.3" },
     { name = "matplotlib", specifier = "==3.9.4" },
     { name = "pyarrow", specifier = ">=24.0.0" },
-    { name = "requests", specifier = ">=2.31.0" },
-    { name = "scikit-learn", specifier = ">=1.5.0" },
+    { name = "requests", marker = "extra == 'pipeline'", specifier = ">=2.31.0" },
+    { name = "scikit-learn", marker = "extra == 'pipeline'", specifier = ">=1.5.0" },
     { name = "shapely", specifier = "==2.0.7" },
-    { name = "xgboost", specifier = ">=3.2.0" },
+    { name = "xgboost", marker = "extra == 'pipeline'", specifier = ">=3.2.0" },
 ]
+provides-extras = ["pipeline"]
 
 [package.metadata.requires-dev]
 dev = [

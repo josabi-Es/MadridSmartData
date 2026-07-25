@@ -14,9 +14,15 @@ dependencies = [
     "huggingface_hub<1.0",
     "matplotlib==3.9.4",
     "pyarrow>=24.0.0",
+    "shapely==2.0.7",
+]
+
+# ingest (CKAN API) + training -- not imported by src/dashboard, so a
+# frontend-only install (`uv sync`) skips them.
+[project.optional-dependencies]
+pipeline = [
     "requests>=2.31.0",
     "scikit-learn>=1.5.0",
-    "shapely==2.0.7",
     "xgboost>=3.2.0",
     "joblib>=1.5.3",
 ]

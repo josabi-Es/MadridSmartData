@@ -15,17 +15,7 @@ forecast → dashboard, orchestrated by Airflow.
 
 ## Workflow
 
-```mermaid
-flowchart LR
-    CKAN["Madrid CKAN API"] --> B["bronze/\nraw parquet"] --> S["silver/\ncleaned"] --> G["gold/\ndims + facts + models"] --> D["Gradio dashboard"]
-    A["Airflow"] -.orchestrates.-> B
-    A -.orchestrates.-> S
-    A -.orchestrates.-> G
-```
-
 ![orchestration](docs/workflow.png)
-
-![airflow](docs/airflow.png)
 
 ## Where the data comes from
 
@@ -52,56 +42,43 @@ docker compose up --build
 
 Two services, two ports:
 
-| Puerto | Servicio | Para qué |
+| Port | Service | What it's for |
 |---|---|---|
-| **7860** | `dashboard` (Gradio) | Ver el resultado — el visualizador, ya con los datos que haya en `data/` |
-| **8081** | `airflow` (`admin`/`admin`, desde `.env`) | Disparar la ingesta y el reentreno |
+| **7860** | `dashboard` (Gradio) | See the result — the visualizer, already reading whatever data is in `data/` |
+| **8081** | `airflow` (`admin`/`admin`, from `.env`) | Trigger ingestion and retraining |
 
-Secuencia de triggers en la UI de Airflow (`Trigger DAG w/ config`):
+Trigger sequence in the Airflow UI (`Trigger DAG w/ config`):
 
-1. **`daily_ingest`** primero — pulls a year/month from the CKAN API into
+1. **`daily_ingest`** first — pulls a year/month from the CKAN API into
    `bronze/`, then runs `src/data/run_pipeline.py` (silver → gold dims/facts).
-2. **`train_forecast`** después, solo una vez haya datos — retrains the
+2. **`train_forecast`** after, only once there's data — retrains the
    forecasting models onto `gold/`.
 
-El dashboard (puerto 7860) lee directamente de `data/`, así que basta con
-refrescar la página tras cada DAG para ver los datos nuevos — no hace
-falta reiniciar el contenedor.
+![airflow](docs/airflow.png)
 
-## Dónde vive el dato
-
-Todo el almacenamiento es local: **[DuckDB](https://duckdb.org)** corre
-consultas SQL directamente sobre ficheros **`.parquet`** en `data/` — sin
-servidor de base de datos, sin instalación aparte. `bronze/` guarda el
-crudo tal cual llega de la API, `silver/` la versión limpia, `gold/` las
-tablas finales y los modelos entrenados.
-
-## Dashboard sin Docker (solo el visualizador)
+## Dashboard without Docker (visualizer only)
 
 ```bash
 cp .env.template .env
 uv run python -m src.dashboard.interface
 ```
 
-`uv run` instala lo que falte y ejecuta en un solo paso — sin `venv`
-manual, sin `activate`. Instala lo mínimo que el visualizador importa de
-verdad, nada de `requests`/`scikit-learn`/`xgboost`. Abre en
+`uv run` installs whatever's missing and runs it in one step — no manual
+`venv`, no `activate`. It only installs what the visualizer actually
+imports, nothing like `requests`/`scikit-learn`/`xgboost`. Opens at
 http://localhost:7860.
 
-Si además quieres correr ingesta o reentreno en local (no en Airflow):
-`uv run --extra pipeline python -m src.ml.train`.
+New to `uv`? `uv sync` installs the dependencies into `.venv/` first if
+you'd rather do it in two steps.
 
-## Stack
-
-Python · DuckDB + Parquet (storage local) · Gradio (UI) · scikit-learn /
-XGBoost (forecasting) · Airflow + Docker (orquestación).
+If you also want to run ingestion or retraining locally (not on
+Airflow): `uv run --extra pipeline python -m src.ml.train`.
 
 ## CI/CD
 
-Pendiente — próximamente.
+Not yet — coming soon.
 
 ---
 
-Más detalle de estructura y convenciones vive en `CLAUDE.md` (gitignored,
-memoria local del proyecto — no hace falta para levantar nada de lo de
-arriba).
+More structure and convention detail lives in `CLAUDE.md` (gitignored,
+local project memory — not needed to run anything above).

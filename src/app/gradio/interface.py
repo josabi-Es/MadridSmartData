@@ -1,30 +1,28 @@
+import os
 
 import gradio as gr
-from first_tab import (
-    cargar_datos,
+from dotenv import load_dotenv
+
+from src.app.gradio.fifth_tab import (
+    graficar_prediccion,
+    metricas_texto,
+    obtener_estaciones_prediccion,
+)
+from src.app.gradio.first_tab import (
     graficar_serie_temporal,
-    iniciar_spark,
     obtener_estaciones,
     obtener_magnitudes,
 )
-from fourth_tab import plot_tendencia_temporal
-from second_tab import cargar_datos_trafico, graficar_serie_trafico
-from third_tab import (
-    generar_estaciones_distrito,
-    generar_leyenda_html,
-    generar_mapa_html,
+from src.app.gradio.fourth_tab import plot_tendencia_temporal
+from src.app.gradio.second_tab import graficar_serie_trafico
+from src.app.gradio.third_tab import generar_leyenda_html, generar_mapa_html
+from src.data.access.queries import get_traffic_districts
+
+load_dotenv()
+
+TRAFFIC_POINTS_PATH = os.getenv(
+    "TRAFFIC_POINTS_PATH", "data/bronze/trafico_puntos_medida/*.parquet"
 )
-
-# Initialize Spark only once
-spark = iniciar_spark()
-
-# Load both datasets only once
-df_cont = cargar_datos(spark)
-df_trafico = cargar_datos_trafico(spark)
-
-# Function to update pollution plot
-def actualizar_grafico(estacion_id, magnitud):
-    return graficar_serie_temporal(df_cont, estacion_id, magnitud)
 
 
 with gr.Blocks() as demo:
@@ -36,12 +34,12 @@ with gr.Blocks() as demo:
             gr.Markdown("# Visualizador de Contaminación en Madrid")
 
             selector_id = gr.Dropdown(
-                choices=obtener_estaciones(df_cont),
+                choices=obtener_estaciones(),
                 label="Estación / Punto de Medida"
             )
-            
+
             selector_magnitud = gr.Dropdown(
-                choices=obtener_magnitudes(df_cont),
+                choices=obtener_magnitudes(),
                 label="Magnitud (gases o partículas)",
                 interactive=True
             )
@@ -50,7 +48,7 @@ with gr.Blocks() as demo:
             grafico = gr.Plot()
 
             boton.click(
-                fn=lambda est, mag: graficar_serie_temporal(df_cont, est, mag),
+                fn=graficar_serie_temporal,
                 inputs=[selector_id, selector_magnitud],
                 outputs=grafico
             )
@@ -75,12 +73,12 @@ with gr.Blocks() as demo:
             grafico_trafico = gr.Plot()
 
             boton_trafico.click(
-                fn=lambda id_text, variable: graficar_serie_trafico(df_trafico, id_text, variable),
+                fn=graficar_serie_trafico,
                 inputs=[input_id_trafico, selector_variable],
                 outputs=grafico_trafico
             )
-            
-            
+
+
 # --------------------------------------------- #
 #         3rd Tab - Map by District             #
 # --------------------------------------------- #
@@ -104,9 +102,6 @@ with gr.Blocks() as demo:
             leyenda_html = gr.HTML()
             mapa_html = gr.HTML()
 
-            
-            estaciones_distrito_df = generar_estaciones_distrito(df_cont)
-
             selector_gas.change(
                 fn=generar_leyenda_html,
                 inputs=selector_gas,
@@ -117,8 +112,8 @@ with gr.Blocks() as demo:
                 inputs=[selector_gas, selector_year, selector_month],
                 outputs=mapa_html
             )
-            
-            
+
+
 
 # --------------------------------------------- #
 #     4th Tab - Traffic vs Gas Correlation       #
@@ -137,7 +132,7 @@ with gr.Blocks() as demo:
             )
 
             selector_distrito = gr.Dropdown(
-                choices=sorted(df_trafico.select("distrito").distinct().rdd.flatMap(lambda x: x).collect()),
+                choices=get_traffic_districts(TRAFFIC_POINTS_PATH),
                 label="Distrito"
             )
 
@@ -145,9 +140,50 @@ with gr.Blocks() as demo:
             grafico_corr = gr.Plot()
 
             boton_corr.click(
-            fn=lambda gas, var, dist: plot_tendencia_temporal(df_cont, df_trafico, estaciones_distrito_df, gas, var, dist),
+            fn=plot_tendencia_temporal,
             inputs=[selector_gas_corr, selector_var_trafico, selector_distrito],
             outputs=grafico_corr
         )
 
-demo.launch(share=True)
+# --------------------------------------------- #
+#     5th Tab - Forecast (real vs. predicted)    #
+# --------------------------------------------- #
+        with gr.TabItem("🔮 Predicción"):
+            gr.Markdown(
+                "### Real vs. predicho (tramo escondido en la validación) "
+                "del modelo ganador de la fase 4 — no se reentrena nada aquí"
+            )
+
+            selector_variable_pred = gr.Dropdown(
+                choices=["NO2", "PM10", "PM2.5", "intensidad"],
+                label="Variable"
+            )
+
+            selector_estacion_pred = gr.Dropdown(
+                label="Estación / Punto de Medida",
+                interactive=True
+            )
+
+            boton_pred = gr.Button("Mostrar predicción")
+            grafico_pred = gr.Plot()
+            metricas_pred = gr.Markdown()
+
+            selector_variable_pred.change(
+                fn=lambda variable: gr.Dropdown(
+                    choices=obtener_estaciones_prediccion(variable)
+                ),
+                inputs=selector_variable_pred,
+                outputs=selector_estacion_pred
+            )
+            selector_variable_pred.change(
+                fn=metricas_texto,
+                inputs=selector_variable_pred,
+                outputs=metricas_pred
+            )
+            boton_pred.click(
+                fn=graficar_prediccion,
+                inputs=[selector_variable_pred, selector_estacion_pred],
+                outputs=grafico_pred
+            )
+
+demo.launch()

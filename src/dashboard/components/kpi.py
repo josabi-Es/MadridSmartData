@@ -1,5 +1,6 @@
 """Texto markdown de las tarjetas de indicadores del dashboard."""
 
+from src.dashboard.components.filters import UNITS
 from src.dashboard.components.map import valores_por_distrito
 from src.data.access.queries import (
     count_stations_by_district,
@@ -27,4 +28,6 @@ def kpi_media_texto(dominio, variable, distrito, anio, mes):
     cod = str(distrito).zfill(2)
     fila = next((v for v in valores if str(v[0]).zfill(2) == cod), None)
     valor = round(fila[1], 2) if fila else None
-    return f"**Media {variable} (distrito {distrito}):** {valor if valor is not None else 'N/A'}"
+    unidad = UNITS.get(variable, "")
+    texto_valor = f"{valor} {unidad}" if valor is not None else "N/A"
+    return f"**Media {variable} (distrito {distrito}):** {texto_valor}"

@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from src.dashboard.components.filters import UNITS
 from src.dashboard.components.kpi import kpi_conteos_texto, kpi_media_texto
 from src.dashboard.components.map import (
     generar_leyenda_html,
@@ -14,8 +15,8 @@ from src.data.access.queries import (
     daily_average_traffic_by_district,
 )
 
-AIRQUALITY_PATH = "data/silver/aire/*.parquet"
-TRAFFIC_PATH = "data/silver/trafico/*.parquet"
+AIRQUALITY_PATH = "data/silver/aire/all.parquet"
+TRAFFIC_PATH = "data/silver/trafico/all.parquet"
 ESTACIONES_DISTRITO_PATH = "data/silver/estaciones_aire/latest.parquet"
 TRAFFIC_POINTS_PATH = "data/bronze/trafico_puntos_medida/*.parquet"
 
@@ -52,7 +53,7 @@ def graficar_evolucion(dominio, variable, distrito):
     ax.plot(fechas, medias, linestyle="-", color="teal")
     ax.set_title(f"Evolución diaria — {variable} — distrito {distrito}")
     ax.set_xlabel("Fecha")
-    ax.set_ylabel(variable)
+    ax.set_ylabel(f"{variable} ({UNITS.get(variable, 'sin unidad')})")
     ax.grid(True)
     fig.autofmt_xdate(rotation=45)
     return fig
@@ -91,8 +92,11 @@ def graficar_correlacion(gas, variable_trafico, distrito):
         label=variable_trafico,
     )
     ax1.set_xlabel("Fecha")
-    ax1.set_ylabel(f"{gas} (µg/m³)", color="crimson")
-    ax2.set_ylabel(variable_trafico, color="royalblue")
+    ax1.set_ylabel(f"{gas} ({UNITS.get(gas, 'sin unidad')})", color="crimson")
+    ax2.set_ylabel(
+        f"{variable_trafico} ({UNITS.get(variable_trafico, 'sin unidad')})",
+        color="royalblue",
+    )
     ax1.tick_params(axis="y", labelcolor="crimson")
     ax2.tick_params(axis="y", labelcolor="royalblue")
     ax1.set_title(f"{gas} vs. {variable_trafico} — distrito {distrito}")

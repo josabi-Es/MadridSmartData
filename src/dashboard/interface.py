@@ -22,6 +22,7 @@ from src.dashboard.tabs.tabla import (
     obtener_estaciones_tabla,
     obtener_magnitudes_tabla,
     tabla_diaria,
+    unidad_texto,
 )
 from src.data.access.queries import TRAFFIC_VARIABLES
 
@@ -119,9 +120,18 @@ with gr.Blocks() as demo:
                 kpi_conteos, kpi_media, grafico_evolucion,
             ]  # fmt: skip
 
+            def _refrescar_variables(dominio, distrito):
+                opciones = obtener_variables(dominio, distrito)
+                return gr.Dropdown(choices=opciones, value=opciones[0])
+
             selector_dominio.change(
-                fn=lambda dominio: gr.Dropdown(choices=obtener_variables(dominio)),
-                inputs=selector_dominio,
+                fn=_refrescar_variables,
+                inputs=[selector_dominio, selector_distrito],
+                outputs=selector_variable,
+            )
+            selector_distrito.change(
+                fn=_refrescar_variables,
+                inputs=[selector_dominio, selector_distrito],
                 outputs=selector_variable,
             )
             for selector in actualizables:
@@ -130,6 +140,14 @@ with gr.Blocks() as demo:
                     inputs=[selector_dominio, selector_variable, selector_distrito, selector_anio, selector_mes],
                     outputs=salidas_refresco,
                 )
+
+            selector_distrito.change(
+                fn=lambda distrito: gr.Dropdown(
+                    choices=obtener_variables("Aire", distrito)
+                ),
+                inputs=selector_distrito,
+                outputs=selector_gas_corr,
+            )
 
             boton_corr.click(
                 fn=graficar_correlacion,
@@ -147,8 +165,10 @@ with gr.Blocks() as demo:
                 choices=obtener_estaciones_tabla(), label="Estación"
             )
             selector_magnitud_tabla = gr.Dropdown(
-                label="Magnitud (gas)", interactive=True
+                label="Magnitud (gas) -- solo lo que mide esta estación",
+                interactive=True,
             )
+            unidad_tabla = gr.Markdown()
             tabla_diaria_df = gr.Dataframe(headers=COLUMNAS, label="Lecturas diarias")
 
             selector_estacion_tabla.change(
@@ -157,6 +177,9 @@ with gr.Blocks() as demo:
                 ),
                 inputs=selector_estacion_tabla,
                 outputs=selector_magnitud_tabla,
+            )
+            selector_magnitud_tabla.change(
+                fn=unidad_texto, inputs=selector_magnitud_tabla, outputs=unidad_tabla
             )
             selector_magnitud_tabla.change(
                 fn=tabla_diaria,

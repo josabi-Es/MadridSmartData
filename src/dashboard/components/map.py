@@ -12,8 +12,8 @@ from src.data.access.queries import (
 )
 
 DISTRITOS_PATH = "data/bronze/distritos/latest.parquet"
-AIRQUALITY_PATH = "data/silver/aire/*.parquet"
-TRAFFIC_PATH = "data/silver/trafico/*.parquet"
+AIRQUALITY_PATH = "data/silver/aire/all.parquet"
+TRAFFIC_PATH = "data/silver/trafico/all.parquet"
 ESTACIONES_DISTRITO_PATH = "data/silver/estaciones_aire/latest.parquet"
 TRAFFIC_POINTS_PATH = "data/bronze/trafico_puntos_medida/*.parquet"
 GOLD_DIM_DISTRITO_PATH = "data/gold/dim_distrito.parquet"

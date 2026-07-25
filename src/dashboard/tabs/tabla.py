@@ -2,6 +2,7 @@
 
 import pandas as pd
 
+from src.dashboard.components.filters import UNITS
 from src.data.access.queries import (
     daily_values_by_station,
     get_magnitudes,
@@ -18,7 +19,14 @@ def obtener_estaciones_tabla():
 
 
 def obtener_magnitudes_tabla(estacion_id):
+    """Solo los gases que esa estación mide de verdad (ya filtrado en queries)."""
     return get_magnitudes(AIRQUALITY_PATH, estacion_id)
+
+
+def unidad_texto(magnitud):
+    if not magnitud:
+        return ""
+    return f"Unidad: {UNITS.get(magnitud, 'sin unidad')}"
 
 
 def tabla_diaria(estacion_id, magnitud):

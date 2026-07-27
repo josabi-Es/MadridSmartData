@@ -1,10 +1,22 @@
 """Spatial join shared by air stations (and gold dims) -- district assignment."""
 
+import os
 from pathlib import Path
 
 import duckdb
 import geopandas as gpd
+from dotenv import load_dotenv
 from shapely.geometry import Point
+
+load_dotenv()
+
+BRONZE_ESTACIONES_PATH = os.getenv(
+    "BRONZE_ESTACIONES_PATH", "data/bronze/estaciones_aire/latest.parquet"
+)
+DISTRITOS_PATH = os.getenv("DISTRITOS_PATH", "data/bronze/distritos/latest.parquet")
+SILVER_ESTACIONES_PATH = os.getenv(
+    "SILVER_ESTACIONES_PATH", "data/silver/estaciones_aire/latest.parquet"
+)
 
 
 def assign_district(stations_path: str, districts_path: str, out_path: str) -> None:
@@ -28,3 +40,11 @@ def assign_district(stations_path: str, districts_path: str, out_path: str) -> N
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     duckdb.sql(f"COPY (SELECT * FROM joined) TO '{out_path}' (FORMAT PARQUET)")
+
+
+def main() -> None:
+    assign_district(BRONZE_ESTACIONES_PATH, DISTRITOS_PATH, SILVER_ESTACIONES_PATH)
+
+
+if __name__ == "__main__":
+    main()

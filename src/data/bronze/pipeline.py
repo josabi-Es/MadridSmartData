@@ -23,6 +23,13 @@ TRAFFIC_TYPES = {
     "vmed": "DOUBLE",
 }
 
+# datos.madrid.es exports CSV as ISO-8859-1 (latin-1), not UTF-8 -- some
+# months/resources happen to have no accented bytes and would decode fine
+# either way, but others (station/street names) don't. latin-1 decodes any
+# byte sequence without raising, so it's the safe default for every direct
+# ingest from this portal.
+_MADRID_OPEN_DATA_ENCODING = "latin-1"
+
 SPANISH_MONTHS = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -64,7 +71,10 @@ def csv_to_parquet(
     con = duckdb.connect()
     con.install_extension("httpfs")
     con.load_extension("httpfs")
-    read_args = f"'{csv_source}', sep=';', encoding='UTF-8', allow_quoted_nulls=true"
+    read_args = (
+        f"'{csv_source}', sep=';', encoding={encoding or 'UTF-8'!r}, "
+        "allow_quoted_nulls=true"
+    )
     if types:
         read_args += f", types={types!r}"
     select = f"SELECT * FROM read_csv_auto({read_args})"
@@ -133,7 +143,9 @@ def ingest_year(dataset: str, year: str, out_dir: str) -> int:
 
     out_path = Path(out_dir) / f"{year}.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    row_count = csv_to_parquet(resource["url"], str(out_path))
+    row_count = csv_to_parquet(
+        resource["url"], str(out_path), encoding=_MADRID_OPEN_DATA_ENCODING
+    )
 
     append_manifest(
         str(Path(out_dir) / "manifest.json"),
@@ -149,7 +161,9 @@ def ingest_snapshot(dataset: str, out_dir: str) -> int:
 
     out_path = Path(out_dir) / "latest.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    row_count = csv_to_parquet(resource["url"], str(out_path))
+    row_count = csv_to_parquet(
+        resource["url"], str(out_path), encoding=_MADRID_OPEN_DATA_ENCODING
+    )
 
     append_manifest(
         str(Path(out_dir) / "manifest.json"),
@@ -165,7 +179,9 @@ def ingest_month_snapshot(dataset: str, month: str, out_dir: str) -> int:
 
     out_path = Path(out_dir) / f"{month}.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    row_count = csv_to_parquet(resource["url"], str(out_path))
+    row_count = csv_to_parquet(
+        resource["url"], str(out_path), encoding=_MADRID_OPEN_DATA_ENCODING
+    )
 
     append_manifest(
         str(Path(out_dir) / "manifest.json"),
@@ -208,7 +224,12 @@ def ingest_traffic_month(month: str, out_dir: str, work_dir: str) -> int:
 
     out_path = Path(out_dir) / f"{month}.parquet"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    row_count = csv_to_parquet(csv_path, str(out_path), types=TRAFFIC_TYPES)
+    row_count = csv_to_parquet(
+        csv_path,
+        str(out_path),
+        types=TRAFFIC_TYPES,
+        encoding=_MADRID_OPEN_DATA_ENCODING,
+    )
     shutil.rmtree(work_dir)
 
     append_manifest(

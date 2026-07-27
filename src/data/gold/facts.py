@@ -51,18 +51,27 @@ def build_fact_trafico(
     duckdb.sql(f"COPY ({query}) TO '{out_path}' (FORMAT PARQUET)")
 
 
-def main() -> None:
+def main(target: str = "all") -> None:
     fact_aire_path = f"{GOLD_DIR}/fact_calidad_aire.parquet"
     fact_trafico_path = f"{GOLD_DIR}/fact_trafico.parquet"
     dim_estacion_path = f"{GOLD_DIR}/dim_estacion_aire.parquet"
     dim_punto_path = f"{GOLD_DIR}/dim_punto_trafico.parquet"
 
-    build_fact_calidad_aire(SILVER_AIR_PATH, dim_estacion_path, fact_aire_path)
-    logger.info("fact_calidad_aire -> %s", fact_aire_path)
+    if target in ("fact_calidad_aire", "all"):
+        build_fact_calidad_aire(SILVER_AIR_PATH, dim_estacion_path, fact_aire_path)
+        logger.info("fact_calidad_aire -> %s", fact_aire_path)
 
-    build_fact_trafico(SILVER_TRAFFIC_PATH, dim_punto_path, fact_trafico_path)
-    logger.info("fact_trafico -> %s", fact_trafico_path)
+    if target in ("fact_trafico", "all"):
+        build_fact_trafico(SILVER_TRAFFIC_PATH, dim_punto_path, fact_trafico_path)
+        logger.info("fact_trafico -> %s", fact_trafico_path)
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--target", default="all",
+        choices=["all", "fact_calidad_aire", "fact_trafico"],
+    )  # fmt: skip
+    main(parser.parse_args().target)

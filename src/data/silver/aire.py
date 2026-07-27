@@ -1,8 +1,15 @@
 """Bronze -> silver cleaning for air quality, per official field docs in findings.md."""
 
+import os
 from pathlib import Path
 
 import duckdb
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BRONZE_AIR_PATH = os.getenv("BRONZE_AIR_PATH", "data/bronze/aire/*.parquet")
+SILVER_AIR_PATH = os.getenv("SILVER_AIR_PATH", "data/silver/aire/all.parquet")
 
 # Official magnitud codes, per the station structure doc (212629-2 PDF).
 MAGNITUD_LABELS = {
@@ -38,3 +45,11 @@ def unpivot_air_quality(bronze_path: str, out_path: str) -> None:
     query = " UNION ALL ".join(days)
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     duckdb.sql(f"COPY ({query}) TO '{out_path}' (FORMAT PARQUET)")
+
+
+def main() -> None:
+    unpivot_air_quality(BRONZE_AIR_PATH, SILVER_AIR_PATH)
+
+
+if __name__ == "__main__":
+    main()

@@ -94,26 +94,41 @@ def build_dim_distrito(
     distritos.to_parquet(out_path)
 
 
-def main() -> None:
+def main(target: str = "all") -> None:
     dim_estacion_path = f"{GOLD_DIR}/dim_estacion_aire.parquet"
     dim_punto_path = f"{GOLD_DIR}/dim_punto_trafico.parquet"
     dim_distrito_path = f"{GOLD_DIR}/dim_distrito.parquet"
-
-    build_dim_estacion_aire(ESTACIONES_AIRE_PATH, DISTRITOS_PATH, dim_estacion_path)
-    logger.info("dim_estacion_aire -> %s", dim_estacion_path)
-
-    build_dim_punto_trafico(TRAFFIC_POINTS_PATH, dim_punto_path)
-    logger.info("dim_punto_trafico -> %s", dim_punto_path)
-
-    build_dim_distrito(
-        DISTRITOS_PATH, dim_estacion_path, dim_punto_path, dim_distrito_path
-    )
-    logger.info("dim_distrito -> %s", dim_distrito_path)
-
     dim_magnitud_path = f"{GOLD_DIR}/dim_magnitud.parquet"
-    build_dim_magnitud(dim_magnitud_path)
-    logger.info("dim_magnitud -> %s", dim_magnitud_path)
+
+    if target in ("dim_estacion_aire", "all"):
+        build_dim_estacion_aire(
+            ESTACIONES_AIRE_PATH, DISTRITOS_PATH, dim_estacion_path
+        )
+        logger.info("dim_estacion_aire -> %s", dim_estacion_path)
+
+    if target in ("dim_punto_trafico", "all"):
+        build_dim_punto_trafico(TRAFFIC_POINTS_PATH, dim_punto_path)
+        logger.info("dim_punto_trafico -> %s", dim_punto_path)
+
+    if target in ("dim_distrito", "all"):
+        build_dim_distrito(
+            DISTRITOS_PATH, dim_estacion_path, dim_punto_path, dim_distrito_path
+        )
+        logger.info("dim_distrito -> %s", dim_distrito_path)
+
+    if target in ("dim_magnitud", "all"):
+        build_dim_magnitud(dim_magnitud_path)
+        logger.info("dim_magnitud -> %s", dim_magnitud_path)
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--target",
+        default="all",
+        choices=["all", "dim_estacion_aire", "dim_punto_trafico",
+                 "dim_distrito", "dim_magnitud"],
+    )  # fmt: skip
+    main(parser.parse_args().target)

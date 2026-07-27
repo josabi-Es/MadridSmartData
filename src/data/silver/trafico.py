@@ -1,8 +1,17 @@
 """Bronze -> silver cleaning for traffic, per official field docs in findings.md."""
 
+import os
 from pathlib import Path
 
 import duckdb
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BRONZE_TRAFFIC_PATH = os.getenv("BRONZE_TRAFFIC_PATH", "data/bronze/trafico/*.parquet")
+SILVER_TRAFFIC_PATH = os.getenv(
+    "SILVER_TRAFFIC_PATH", "data/silver/trafico/all.parquet"
+)
 
 TRAFFIC_METRICS = ["intensidad", "ocupacion", "carga", "vmed"]
 
@@ -29,3 +38,11 @@ def clean_traffic(bronze_path: str, out_path: str) -> None:
     # container). Cap it here rather than tuning the container's memory.
     duckdb.sql("SET threads=2; SET memory_limit='1GB';")
     duckdb.sql(f"COPY ({query}) TO '{out_path}' (FORMAT PARQUET)")
+
+
+def main() -> None:
+    clean_traffic(BRONZE_TRAFFIC_PATH, SILVER_TRAFFIC_PATH)
+
+
+if __name__ == "__main__":
+    main()

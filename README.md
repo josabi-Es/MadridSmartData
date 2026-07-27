@@ -56,7 +56,7 @@ Trigger sequence in the Airflow UI (`Trigger DAG w/ config`):
 
 ![airflow](docs/airflow.png)
 
-## Dashboard without Docker (visualizer only)
+## Dashboard cli
 
 ```bash
 cp .env.template .env
@@ -67,7 +67,37 @@ uv run python -m src.dashboard.interface
 
 ## CI/CD
 
-Not yet, coming soon.
+**CI**: en cada `push`/merge a `main` (nunca en ramas o PRs sueltos) se
+corre `ruff check` + `pytest` vía GitHub Actions (`.github/workflows/ci-cd.yml`).
+
+**CD**: no hay despliegue real todavía — se simula. Un commit *breaking*
+(Conventional Commits: `feat!: ...` o footer `BREAKING CHANGE: ...`) crea
+automáticamente una rama `release-v{N}` a partir de `main`, numerada de
+forma secuencial (`release-v1`, `release-v2`, ...). Esa sería la rama que
+un servidor de producción leería siempre — la más alta es la más
+actualizada. Un `feat:`/`fix:` normal solo deja `main` en verde, sin crear
+rama nueva.
+
+Para dispararlo al hacer *squash merge* de un PR: el mensaje del commit de
+squash es por defecto el título del PR (editable en la caja de merge) —
+ahí va el `!` (`feat!: cambia el esquema de X`), o si se prefiere no tocar
+el título, una línea `BREAKING CHANGE: ...` en el cuerpo de esa misma caja.
+
+```mermaid
+flowchart LR
+    A[push / squash-merge a main] --> B[CI: ruff check + pytest]
+    B -->|falla| X((main queda rojo))
+    B -->|ok| C{commit breaking?}
+    C -->|no: feat/fix normal| D((main queda verde))
+    C -->|sí: feat!/BREAKING CHANGE| E[crear release-v N+1]
+    E --> F[(producción lee siempre\nla release-v más alta)]
+```
+
+`release-please-config.json` / `.release-please-manifest.json` declaran la
+política de versionado (semver por Conventional Commits); en esta
+simulación no se invoca la action real de `release-please` — el paso de
+arriba reproduce directamente su efecto (detectar breaking → nueva
+versión).
 
 ---
 

@@ -231,3 +231,53 @@ def count_traffic_points_by_district(points_path: str, distrito: str) -> int:
         WHERE CAST(distrito AS VARCHAR) = '{distrito}'
     """
     return duckdb.sql(query).fetchone()[0]
+
+
+def get_air_districts_by_variable(
+    air_path: str, stations_path: str, gas: str
+) -> list[str]:
+    """Districts with at least one valid reading of `gas` -- the reverse
+    cascade of `get_air_variables_by_district`, for narrowing the distrito
+    dropdown once a gas is picked."""
+    query = f"""
+        SELECT DISTINCT s.COD_DIS
+        FROM '{air_path}' a
+        JOIN '{stations_path}' s ON a.estacion = s.CODIGO_CORTO
+        WHERE a.magnitud = '{gas}' AND a.validez = 'V'
+        ORDER BY s.COD_DIS
+    """
+    return [r[0] for r in duckdb.sql(query).fetchall()]
+
+
+def get_air_periods_by_district(
+    air_path: str, stations_path: str, gas: str, distrito: str
+) -> list[tuple[int, int]]:
+    """Distinct (año, mes) with a valid `gas` reading in this district."""
+    query = f"""
+        SELECT DISTINCT extract(year FROM a.fecha)::INT AS anio,
+               extract(month FROM a.fecha)::INT AS mes
+        FROM '{air_path}' a
+        JOIN '{stations_path}' s ON a.estacion = s.CODIGO_CORTO
+        WHERE a.magnitud = '{gas}' AND a.validez = 'V' AND s.COD_DIS = '{distrito}'
+        ORDER BY anio, mes
+    """
+    return duckdb.sql(query).fetchall()
+
+
+def get_traffic_periods_by_district(
+    traffic_path: str, points_path: str, variable: str, distrito: str
+) -> list[tuple[int, int]]:
+    """Distinct (año, mes) with a valid reading of a traffic variable in this
+    district. No hour filter (unlike `daily_average_traffic_by_district`) --
+    a period with data only outside noon must still count as available."""
+    if variable not in TRAFFIC_VARIABLES:
+        raise ValueError(f"unknown traffic variable: {variable!r}")
+    query = f"""
+        SELECT DISTINCT extract(year FROM t.fecha)::INT AS anio,
+               extract(month FROM t.fecha)::INT AS mes
+        FROM '{traffic_path}' t
+        JOIN '{points_path}' p ON t.id = p.id
+        WHERE t.error = 'N' AND CAST(p.distrito AS VARCHAR) = '{distrito}'
+        ORDER BY anio, mes
+    """
+    return duckdb.sql(query).fetchall()

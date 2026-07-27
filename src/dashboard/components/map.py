@@ -19,14 +19,32 @@ TRAFFIC_POINTS_PATH = "data/bronze/trafico_puntos_medida/*.parquet"
 GOLD_DIM_DISTRITO_PATH = "data/gold/dim_distrito.parquet"
 
 # Tramos de color por variable -- aire en µg/m³, tráfico en sus propias unidades.
+#
+# GAS_TRAMOS (NO2/PM10/PM2.5/O3): Índice de Calidad del Aire oficial de
+# España/UE (MITECO), colapsando sus 6 categorías a los 4 colores que usa
+# el dashboard (Buena+Razonablemente buena -> verde, Regular -> amarillo,
+# Desfavorable -> naranja, Muy desfavorable+Extremadamente desfavorable ->
+# rojo). Fuente externa a los 4 PDF de estructura de datos del proyecto --
+# ninguno de esos PDF define umbrales de color (verificado: solo describen
+# formato de fichero, códigos de estación/magnitud y ubicación de puntos).
+# El índice oficial usa periodos de referencia horario (NO2) o máx. 8h
+# (O3), mientras el dashboard pinta medias diarias/mensuales -- se toma
+# como escala visual aproximada, no como clasificación regulatoria literal.
+# NOx no tiene índice horario público (solo un límite anual de protección
+# a la vegetación), así que se deja con el tramo heurístico previo.
 GAS_TRAMOS = {
-    "NO2": [(0, 10, "green"), (10, 25, "yellow"), (25, 40, "orange"), (40, float("inf"), "red")],
-    "PM10": [(0, 15, "green"), (15, 25, "yellow"), (25, 40, "orange"), (40, float("inf"), "red")],
-    "PM2.5": [(0, 5, "green"), (5, 10, "yellow"), (10, 25, "orange"), (25, float("inf"), "red")],
-    "O3": [(0, 60, "green"), (60, 90, "yellow"), (90, 120, "orange"), (120, float("inf"), "red")],
+    "NO2": [(0, 90, "green"), (90, 120, "yellow"), (120, 230, "orange"), (230, float("inf"), "red")],
+    "PM10": [(0, 40, "green"), (40, 50, "yellow"), (50, 100, "orange"), (100, float("inf"), "red")],
+    "PM2.5": [(0, 20, "green"), (20, 25, "yellow"), (25, 50, "orange"), (50, float("inf"), "red")],
+    "O3": [(0, 100, "green"), (100, 130, "yellow"), (130, 240, "orange"), (240, float("inf"), "red")],
     "NOx": [(0, 50, "green"), (50, 100, "yellow"), (100, 150, "orange"), (150, float("inf"), "red")],
 }  # fmt: skip
 
+# El PDF oficial de tráfico de Madrid (Trafico_Estructura_DS_Contenido_
+# Trafico_Historico.pdf) admite explícitamente que "carga" se publica como
+# valor bruto sin justificar sus coeficientes -- no existe una escala de
+# color oficial para tráfico en ningún sitio. Los tramos de abajo son
+# heurísticos (ya lo eran antes de esta revisión), sin cambios de valores.
 TRAFFIC_TRAMOS = {
     "carga": [(0, 25, "green"), (25, 50, "yellow"), (50, 75, "orange"), (75, float("inf"), "red")],
     "ocupacion": [(0, 20, "green"), (20, 40, "yellow"), (40, 60, "orange"), (60, float("inf"), "red")],

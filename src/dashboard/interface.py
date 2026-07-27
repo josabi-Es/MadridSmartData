@@ -2,12 +2,14 @@ import gradio as gr
 
 from src.dashboard.components.filters import (
     AIR_VARIABLES,
+    ANIOS_FALLBACK,
+    MESES_FALLBACK,
+    obtener_anios,
     obtener_distritos,
+    obtener_meses,
     obtener_variables,
 )
 from src.dashboard.tabs.overview import (
-    ANIOS,
-    MESES,
     graficar_correlacion,
     refrescar,
 )
@@ -83,21 +85,20 @@ with gr.Blocks() as demo:
                 selector_distrito = gr.Dropdown(
                     choices=obtener_distritos(), label="Distrito"
                 )
-                selector_anio = gr.Dropdown(choices=ANIOS, value=2024, label="Año")
-                selector_mes = gr.Dropdown(choices=MESES, value=1, label="Mes")
+                selector_anio = gr.Dropdown(
+                    choices=ANIOS_FALLBACK, value=2024, label="Año"
+                )
+                selector_mes = gr.Dropdown(
+                    choices=MESES_FALLBACK, value=1, label="Mes"
+                )
 
             with gr.Row():
                 kpi_conteos = gr.Markdown()
                 kpi_media = gr.Markdown()
 
-            with gr.Row():
-                with gr.Column(scale=1):
-                    gr.Markdown("**Posiciones** (estaciones/puntos)")
-                    mapa_posiciones_html = gr.HTML()
-                with gr.Column(scale=1):
-                    gr.Markdown("**Colores** (media por distrito)")
-                    leyenda_html = gr.HTML()
-                    mapa_colores_html = gr.HTML()
+            gr.Markdown("**Colores** (media por distrito)")
+            leyenda_html = gr.HTML()
+            mapa_colores_html = gr.HTML()
 
             grafico_evolucion = gr.Plot(label="Evolución temporal")
 
@@ -116,24 +117,78 @@ with gr.Blocks() as demo:
 
             actualizables = [selector_variable, selector_distrito, selector_anio, selector_mes]
             salidas_refresco = [
-                leyenda_html, mapa_posiciones_html, mapa_colores_html,
+                leyenda_html, mapa_colores_html,
                 kpi_conteos, kpi_media, grafico_evolucion,
             ]  # fmt: skip
 
-            def _refrescar_variables(dominio, distrito):
-                opciones = obtener_variables(dominio, distrito)
-                return gr.Dropdown(choices=opciones, value=opciones[0])
+            def _dropdown_preservando_valor(opciones, valor_actual):
+                """Conserva `valor_actual` si sigue siendo válido -- si no
+                cambia, Gradio no dispara `.change()` en el propio
+                desplegable, evitando que la cascada rebote entre sí misma."""
+                if valor_actual in opciones:
+                    return gr.Dropdown(choices=opciones, value=valor_actual)
+                valor = opciones[0] if opciones else None
+                return gr.Dropdown(choices=opciones, value=valor)
+
+            def _refrescar_variables(dominio, distrito, variable_actual):
+                return _dropdown_preservando_valor(
+                    obtener_variables(dominio, distrito), variable_actual
+                )
+
+            def _refrescar_distritos(dominio, variable, distrito_actual):
+                return _dropdown_preservando_valor(
+                    obtener_distritos(dominio, variable), distrito_actual
+                )
+
+            def _refrescar_anios(dominio, variable, distrito, anio_actual):
+                return _dropdown_preservando_valor(
+                    obtener_anios(dominio, variable, distrito), anio_actual
+                )
+
+            def _refrescar_meses(dominio, variable, distrito, anio, mes_actual):
+                return _dropdown_preservando_valor(
+                    obtener_meses(dominio, variable, distrito, anio), mes_actual
+                )
+
+            cascada_anio_mes = [
+                (selector_dominio, [selector_dominio, selector_variable, selector_distrito]),
+                (selector_variable, [selector_dominio, selector_variable, selector_distrito]),
+                (selector_distrito, [selector_dominio, selector_variable, selector_distrito]),
+            ]  # fmt: skip
+            for disparador, entradas_anio in cascada_anio_mes:
+                disparador.change(
+                    fn=_refrescar_anios, inputs=entradas_anio, outputs=selector_anio
+                ).then(
+                    fn=_refrescar_meses,
+                    inputs=[*entradas_anio, selector_anio],
+                    outputs=selector_mes,
+                )
+            selector_anio.change(
+                fn=_refrescar_meses,
+                inputs=[selector_dominio, selector_variable, selector_distrito, selector_anio],
+                outputs=selector_mes,
+            )
 
             selector_dominio.change(
                 fn=_refrescar_variables,
-                inputs=[selector_dominio, selector_distrito],
+                inputs=[selector_dominio, selector_distrito, selector_variable],
                 outputs=selector_variable,
+            ).then(
+                fn=_refrescar_distritos,
+                inputs=[selector_dominio, selector_variable, selector_distrito],
+                outputs=selector_distrito,
+            )
+            selector_variable.change(
+                fn=_refrescar_distritos,
+                inputs=[selector_dominio, selector_variable, selector_distrito],
+                outputs=selector_distrito,
             )
             selector_distrito.change(
                 fn=_refrescar_variables,
-                inputs=[selector_dominio, selector_distrito],
+                inputs=[selector_dominio, selector_distrito, selector_variable],
                 outputs=selector_variable,
             )
+
             for selector in actualizables:
                 selector.change(
                     fn=refrescar,

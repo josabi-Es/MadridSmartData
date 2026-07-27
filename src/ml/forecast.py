@@ -19,9 +19,15 @@ def recursive_forecast(
     df = df.sort_values("fecha")
     last_date = df["fecha"].max()
 
-    partitions = df[partition_col].unique()
     tail_by_partition = df.groupby(partition_col)[target_col].apply(
         lambda s: s.to_numpy()[-30:]
+    )
+    # A partition can have fewer than 30 rows left after the feature build's
+    # warm-up filter (e.g. a traffic sensor with little history) -- np.stack
+    # needs every tail the same length, so those partitions get dropped
+    # instead of crashing the whole forecast.
+    partitions = np.array(
+        [p for p in df[partition_col].unique() if len(tail_by_partition[p]) == 30]
     )
     buffer = np.stack([tail_by_partition[p] for p in partitions]).astype(float)
 

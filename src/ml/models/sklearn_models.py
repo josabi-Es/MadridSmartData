@@ -40,8 +40,12 @@ class _SklearnWrapper(ForecastModel):
 
 
 class DecisionTreeModel(_SklearnWrapper):
-    def __init__(self) -> None:
-        super().__init__(DecisionTreeRegressor(random_state=RANDOM_STATE))
+    # ponytail: max_depth=8 keeps this cheap for notebook/CI runs; the
+    # heavy-grid cell in src/ml/notebooks/decision_tree.ipynb sweeps wider.
+    def __init__(self, max_depth: int = 8) -> None:
+        super().__init__(
+            DecisionTreeRegressor(random_state=RANDOM_STATE, max_depth=max_depth)
+        )
 
     @property
     def name(self) -> str:
@@ -49,8 +53,17 @@ class DecisionTreeModel(_SklearnWrapper):
 
 
 class RandomForestModel(_SklearnWrapper):
-    def __init__(self) -> None:
-        super().__init__(RandomForestRegressor(random_state=RANDOM_STATE))
+    # ponytail: n_estimators/max_depth trimmed from sklearn's 100/unbounded
+    # defaults so a full run stays fast on modest hardware; see the
+    # commented grid-search cell in src/ml/notebooks/random_forest.ipynb.
+    def __init__(self, n_estimators: int = 50, max_depth: int = 10) -> None:
+        super().__init__(
+            RandomForestRegressor(
+                random_state=RANDOM_STATE,
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+            )
+        )
 
     @property
     def name(self) -> str:
@@ -58,8 +71,16 @@ class RandomForestModel(_SklearnWrapper):
 
 
 class XGBoostModel(_SklearnWrapper):
-    def __init__(self) -> None:
-        super().__init__(XGBRegressor(random_state=RANDOM_STATE))
+    # ponytail: trimmed from xgboost's 100 rounds/depth 6 defaults; see the
+    # commented grid-search cell in src/ml/notebooks/xgboost.ipynb.
+    def __init__(self, n_estimators: int = 50, max_depth: int = 4) -> None:
+        super().__init__(
+            XGBRegressor(
+                random_state=RANDOM_STATE,
+                n_estimators=n_estimators,
+                max_depth=max_depth,
+            )
+        )
 
     @property
     def name(self) -> str:
@@ -67,8 +88,18 @@ class XGBoostModel(_SklearnWrapper):
 
 
 class MLPModel(_SklearnWrapper):
-    def __init__(self) -> None:
-        super().__init__(MLPRegressor(random_state=RANDOM_STATE, max_iter=1000))
+    # ponytail: one small hidden layer instead of (100,)/1000 iters; see the
+    # commented grid-search cell in src/ml/notebooks/mlp.ipynb.
+    def __init__(
+        self, hidden_layer_sizes: tuple[int, ...] = (16,), max_iter: int = 300
+    ) -> None:
+        super().__init__(
+            MLPRegressor(
+                random_state=RANDOM_STATE,
+                hidden_layer_sizes=hidden_layer_sizes,
+                max_iter=max_iter,
+            )
+        )
 
     @property
     def name(self) -> str:

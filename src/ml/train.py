@@ -3,17 +3,14 @@
 Usage: python -m src.ml.train
 """
 
-import json
 import os
 from pathlib import Path
 
-import joblib
 import pandas as pd
 from dotenv import load_dotenv
 
-from src.ml.evaluate import last_fold_predictions, walk_forward_evaluate
+from src.ml.evaluate import walk_forward_evaluate
 from src.ml.features import build_air_features, build_traffic_features
-from src.ml.forecast import recursive_forecast
 from src.ml.models.sklearn_models import (
     DecisionTreeModel,
     MLPModel,
@@ -21,6 +18,7 @@ from src.ml.models.sklearn_models import (
     RandomForestModel,
     XGBoostModel,
 )
+from src.ml.promote import refit_and_persist
 
 load_dotenv()
 
@@ -52,45 +50,24 @@ def _train_and_save(
     """Compare the 5 models on `df`, refit the winner on all of it, save with joblib.
 
     Also persists the comparison table and a held-out real-vs-predicted table
-    (spec 005 reads these instead of recomputing them from the tab).
+    (spec 005 reads these instead of recomputing them from the tab). The
+    refit/persist tail is shared with the Airflow DAG's promotion task via
+    `src.ml.promote.refit_and_persist` -- single source of truth for the
+    winner-selection criterion.
     """
     comparison = walk_forward_evaluate(
         [cls() for cls in MODEL_CLASSES], df, target_col, feature_cols
     )
-    winner_name = comparison.iloc[0]["model"]
-    winner_cls = next(cls for cls in MODEL_CLASSES if cls().name == winner_name)
-
-    winner = winner_cls()
-    winner.fit(df[feature_cols], df[target_col])
-
-    # Flat "ml_<variable>_<year>*" naming (no subfolders): each retrain with
-    # more history lands in its own file instead of silently overwriting
-    # last year's artifact, and the tab always resolves the latest one.
-    year = int(df["fecha"].max().year)
-    stem = f"ml_{variable}_{year}"
-
-    Path(MODELS_DIR).mkdir(parents=True, exist_ok=True)
-    out_path = Path(MODELS_DIR) / f"{stem}.joblib"
-    joblib.dump(winner, out_path)
-
-    metrics_path = Path(MODELS_DIR) / f"{stem}_metrics.json"
-    metrics_path.write_text(
-        json.dumps(
-            {"winner": winner_name, "comparison": comparison.to_dict("records")}
-        )
+    return refit_and_persist(
+        variable,
+        df,
+        target_col,
+        feature_cols,
+        partition_col,
+        comparison,
+        MODELS_DIR,
+        horizon=FORECAST_HORIZON,
     )
-
-    holdout = last_fold_predictions(
-        winner_cls(), df, target_col, feature_cols, partition_col
-    )
-    holdout.to_parquet(Path(MODELS_DIR) / f"{stem}_holdout.parquet")
-
-    future = recursive_forecast(
-        winner, df, target_col, feature_cols, partition_col, horizon=FORECAST_HORIZON
-    )
-    future.to_parquet(Path(MODELS_DIR) / f"{stem}_future.parquet")
-
-    return comparison, winner_name, out_path
 
 
 def main() -> dict[str, tuple[pd.DataFrame, str, Path]]:

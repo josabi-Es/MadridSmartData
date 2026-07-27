@@ -19,4 +19,16 @@ RUN pip install --no-cache-dir \
     geopandas>=1.0.1 shapely requests>=2.31.0 \
     scikit-learn>=1.5.0 xgboost>=3.2.0 joblib>=1.5.3 dotenv>=0.9.9 pyarrow>=24.0.0
 
+# papermill/ipykernel: needed by src/ml/notebooks/run_one.py to execute the
+# 5 per-model notebooks from the retrain_forecast DAG. matplotlib: the
+# notebooks plot EDA/holdout charts (it's a base dep in pyproject.toml for
+# the dashboard, but this image only installs from a hand-picked list, so
+# it needs to be listed here too). Same constraint URL as above -- resolved
+# cleanly against it in local `uv sync` (no gradio/fastapi in this image to
+# collide with, see comment above).
+RUN pip install --no-cache-dir \
+    --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.4/constraints-3.11.txt" \
+    papermill>=2.6.0 ipykernel>=6.29.0 matplotlib==3.9.4
+RUN python -m ipykernel install --sys-prefix --name python3
+
 ENV PYTHONPATH=/opt/repo

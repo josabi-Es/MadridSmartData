@@ -1,8 +1,8 @@
-.PHONY: install test ingest pipeline train dashboard airflow-up airflow-down
+.PHONY: install test ingest pipeline train dashboard airflow-up airflow-down train-dag clean
 
 install:
 	@test -d .venv || uv venv
-	uv sync
+	uv sync --extra pipeline
 
 test:
 	uv run pytest
@@ -29,3 +29,9 @@ airflow-up:
 
 airflow-down:
 	docker compose down
+
+train-dag: ## Dispara el DAG de reentreno (20 notebooks en paralelo + promoción)
+	docker compose exec airflow airflow dags trigger retrain_forecast
+
+clean: ## Borra cachés locales y notebooks ejecutados (no toca data/*.parquet)
+	uv run python -m src.ml.notebooks.clean_cache

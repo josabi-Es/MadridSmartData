@@ -1,19 +1,23 @@
 import gradio as gr
 
+import os
+from dotenv import load_dotenv
+
 from src.dashboard.components.filters import (
     AIR_VARIABLES,
-    ANIOS_FALLBACK,
-    MESES_FALLBACK,
-    obtener_anios,
     obtener_distritos,
-    obtener_meses,
     obtener_variables,
 )
+
+load_dotenv()
+ANIOS_FALLBACK = list(range(int(os.getenv("INGEST_YEAR_START", "2023")), int(os.getenv("INGEST_YEAR_END", "2025")) + 1))
+MESES_FALLBACK = list(range(1, 13))
 from src.dashboard.tabs.overview import (
     graficar_correlacion,
     refrescar,
 )
 from src.dashboard.tabs.prediction import (
+    gases_disponibles,
     graficar_prediccion,
     metricas_texto,
     obtener_estaciones_prediccion,
@@ -31,11 +35,11 @@ from src.data.access.queries import TRAFFIC_VARIABLES
 with gr.Blocks() as demo:
     with gr.Tabs():
 # --------------------------------------------- #
-#     1st Tab - Resumen (catálogo, lee gold)     #
+#     1st Tab - Summary (catalog, reads gold)     #
 # --------------------------------------------- #
         with gr.TabItem("📋 Resumen"):
             gr.Markdown(
-                "# Resumen del catálogo — lee de `data/gold/`, sin datos de medición"
+                "# Catalog summary"
             )
 
             (
@@ -54,12 +58,12 @@ with gr.Blocks() as demo:
                     gr.Markdown("**Posiciones** (estaciones/puntos)")
                     resumen_mapa_posiciones = gr.HTML(mapa_pos_ini)
                 with gr.Column(scale=1):
-                    gr.Markdown("**Cobertura de aire** (verde = con estación, rojo = sin)")
+                    gr.Markdown("**Air coverage** (green = with station, red = without)")
                     resumen_mapa_cobertura = gr.HTML(mapa_cob_ini)
 
             resumen_tabla = gr.HTML(tabla_ini)
 
-            resumen_boton = gr.Button("🔄 Actualizar (releer gold/)")
+            resumen_boton = gr.Button("🔄 Refresh")
             resumen_boton.click(
                 fn=refrescar_resumen,
                 outputs=[
@@ -73,36 +77,42 @@ with gr.Blocks() as demo:
 #     2nd Tab - Overview dashboard               #
 # --------------------------------------------- #
         with gr.TabItem("📊 Dashboard"):
-            gr.Markdown("# Madrid: calidad del aire y tráfico por distrito")
+            gr.Markdown("# Madrid: air quality and traffic by district")
+
+            with gr.Row():
+                with gr.Column(scale=0, min_width=180):
+                    gr.Markdown("**Colors**")
+                    leyenda_html = gr.HTML()
+                with gr.Column(scale=4):
+                    mapa_colores_html = gr.HTML()
 
             with gr.Row():
                 selector_dominio = gr.Dropdown(
-                    choices=["Aire", "Tráfico"], value="Aire", label="Aire/Tráfico"
+                    choices=["Aire", "Tráfico"], value="Aire", label="Air/Traffic"
                 )
                 selector_variable = gr.Dropdown(
                     choices=obtener_variables("Aire"), label="Variable"
                 )
                 selector_distrito = gr.Dropdown(
-                    choices=obtener_distritos(), label="Distrito"
+                    choices=obtener_distritos(), label="District"
                 )
                 selector_anio = gr.Dropdown(
-                    choices=ANIOS_FALLBACK, value=2024, label="Año"
+                    choices=ANIOS_FALLBACK, value=2024, label="Year"
                 )
                 selector_mes = gr.Dropdown(
-                    choices=MESES_FALLBACK, value=1, label="Mes"
+                    choices=MESES_FALLBACK, value=1, label="Month"
                 )
+
+            with gr.Row():
+                boton_buscar = gr.Button("🔍 Buscar")
 
             with gr.Row():
                 kpi_conteos = gr.Markdown()
                 kpi_media = gr.Markdown()
 
-            gr.Markdown("**Colores** (media por distrito)")
-            leyenda_html = gr.HTML()
-            mapa_colores_html = gr.HTML()
+            grafico_evolucion = gr.Plot(label="Temporal evolution")
 
-            grafico_evolucion = gr.Plot(label="Evolución temporal")
-
-            with gr.Accordion("Correlación aire ↔ tráfico", open=False):
+            with gr.Accordion("Air ↔ traffic correlation", open=False):
                 with gr.Row():
                     selector_gas_corr = gr.Dropdown(
                         choices=AIR_VARIABLES, value="NO2", label="Gas"
@@ -110,91 +120,37 @@ with gr.Blocks() as demo:
                     selector_var_trafico_corr = gr.Dropdown(
                         choices=sorted(TRAFFIC_VARIABLES),
                         value="intensidad",
-                        label="Variable de tráfico",
+                        label="Traffic variable",
                     )
-                boton_corr = gr.Button("Mostrar correlación")
+                boton_corr = gr.Button("Show correlation")
                 grafico_correlacion = gr.Plot()
 
-            actualizables = [selector_variable, selector_distrito, selector_anio, selector_mes]
             salidas_refresco = [
                 leyenda_html, mapa_colores_html,
                 kpi_conteos, kpi_media, grafico_evolucion,
             ]  # fmt: skip
 
-            def _dropdown_preservando_valor(opciones, valor_actual):
-                """Conserva `valor_actual` si sigue siendo válido -- si no
-                cambia, Gradio no dispara `.change()` en el propio
-                desplegable, evitando que la cascada rebote entre sí misma."""
-                if valor_actual in opciones:
-                    return gr.Dropdown(choices=opciones, value=valor_actual)
+            # Botón único "Buscar" dispara refrescar(), sin cascadas automáticas
+            boton_buscar.click(
+                fn=refrescar,
+                inputs=[selector_dominio, selector_variable, selector_distrito, selector_anio, selector_mes],
+                outputs=salidas_refresco,
+            )
+
+            # Mínima cascada: solo Dominio → Variable
+            # Años/Meses vienen del .env (INGEST_YEAR_START, INGEST_YEAR_END, meses 1-12)
+            def _refrescar_variables(dominio, variable_actual):
+                opciones = obtener_variables(dominio)
+                if variable_actual in opciones:
+                    return gr.Dropdown(choices=opciones, value=variable_actual)
                 valor = opciones[0] if opciones else None
                 return gr.Dropdown(choices=opciones, value=valor)
 
-            def _refrescar_variables(dominio, distrito, variable_actual):
-                return _dropdown_preservando_valor(
-                    obtener_variables(dominio, distrito), variable_actual
-                )
-
-            def _refrescar_distritos(dominio, variable, distrito_actual):
-                return _dropdown_preservando_valor(
-                    obtener_distritos(dominio, variable), distrito_actual
-                )
-
-            def _refrescar_anios(dominio, variable, distrito, anio_actual):
-                return _dropdown_preservando_valor(
-                    obtener_anios(dominio, variable, distrito), anio_actual
-                )
-
-            def _refrescar_meses(dominio, variable, distrito, anio, mes_actual):
-                return _dropdown_preservando_valor(
-                    obtener_meses(dominio, variable, distrito, anio), mes_actual
-                )
-
-            cascada_anio_mes = [
-                (selector_dominio, [selector_dominio, selector_variable, selector_distrito]),
-                (selector_variable, [selector_dominio, selector_variable, selector_distrito]),
-                (selector_distrito, [selector_dominio, selector_variable, selector_distrito]),
-            ]  # fmt: skip
-            for disparador, entradas_anio in cascada_anio_mes:
-                disparador.change(
-                    fn=_refrescar_anios, inputs=entradas_anio, outputs=selector_anio
-                ).then(
-                    fn=_refrescar_meses,
-                    inputs=[*entradas_anio, selector_anio],
-                    outputs=selector_mes,
-                )
-            selector_anio.change(
-                fn=_refrescar_meses,
-                inputs=[selector_dominio, selector_variable, selector_distrito, selector_anio],
-                outputs=selector_mes,
-            )
-
             selector_dominio.change(
                 fn=_refrescar_variables,
-                inputs=[selector_dominio, selector_distrito, selector_variable],
-                outputs=selector_variable,
-            ).then(
-                fn=_refrescar_distritos,
-                inputs=[selector_dominio, selector_variable, selector_distrito],
-                outputs=selector_distrito,
-            )
-            selector_variable.change(
-                fn=_refrescar_distritos,
-                inputs=[selector_dominio, selector_variable, selector_distrito],
-                outputs=selector_distrito,
-            )
-            selector_distrito.change(
-                fn=_refrescar_variables,
-                inputs=[selector_dominio, selector_distrito, selector_variable],
+                inputs=[selector_dominio, selector_variable],
                 outputs=selector_variable,
             )
-
-            for selector in actualizables:
-                selector.change(
-                    fn=refrescar,
-                    inputs=[selector_dominio, selector_variable, selector_distrito, selector_anio, selector_mes],
-                    outputs=salidas_refresco,
-                )
 
             selector_distrito.change(
                 fn=lambda distrito: gr.Dropdown(
@@ -211,20 +167,20 @@ with gr.Blocks() as demo:
             )
 
 # --------------------------------------------- #
-#     3rd Tab - Tabla filtrable                  #
+#     3rd Tab - Filterable table                 #
 # --------------------------------------------- #
         with gr.TabItem("📄 Tabla"):
-            gr.Markdown("### Lecturas diarias por estación y gas")
+            gr.Markdown("### Daily readings by station and gas")
 
             selector_estacion_tabla = gr.Dropdown(
-                choices=obtener_estaciones_tabla(), label="Estación"
+                choices=obtener_estaciones_tabla(), label="Station"
             )
             selector_magnitud_tabla = gr.Dropdown(
-                label="Magnitud (gas) -- solo lo que mide esta estación",
+                label="Magnitude (gas) -- only what this station measures",
                 interactive=True,
             )
             unidad_tabla = gr.Markdown()
-            tabla_diaria_df = gr.Dataframe(headers=COLUMNAS, label="Lecturas diarias")
+            tabla_diaria_df = gr.Dataframe(headers=COLUMNAS, label="Daily readings")
 
             selector_estacion_tabla.change(
                 fn=lambda estacion: gr.Dropdown(
@@ -247,21 +203,20 @@ with gr.Blocks() as demo:
 # --------------------------------------------- #
         with gr.TabItem("🔮 Predicción"):
             gr.Markdown(
-                "### Real vs. predicho (tramo escondido en la validación) "
-                "del modelo ganador de la fase 4 — no se reentrena nada aquí"
+                "### Air Quality Forecast"
             )
 
             selector_variable_pred = gr.Dropdown(
-                choices=["NO2", "PM10", "PM2.5", "intensidad"],
-                label="Variable"
+                choices=gases_disponibles(),
+                label="Gas"
             )
 
             selector_estacion_pred = gr.Dropdown(
-                label="Estación / Punto de Medida",
+                label="Station / Measurement Point",
                 interactive=True
             )
 
-            boton_pred = gr.Button("Mostrar predicción")
+            boton_pred = gr.Button("Show prediction")
             grafico_pred = gr.Plot()
             metricas_pred = gr.Markdown()
 

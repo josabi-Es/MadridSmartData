@@ -13,13 +13,16 @@ python -m src.dashboard.interface
 No Spark, no HDFS -- everything reads local Parquet through DuckDB
 (`src/data/access/queries.py`), plus `geopandas` for the district map.
 
-## Estructura
+## Structure
 
-- `interface.py` -- entry point, cablea las 2 pestañas
-- `components/` -- piezas reusables: `filters.py` (opciones de los
-  desplegables), `map.py` (choropleth + marcadores + escalas de color),
-  `kpi.py` (texto de las tarjetas de indicadores)
-- `tabs/overview.py` -- dashboard interactivo: filtros compartidos, KPIs,
-  mapa, evolución temporal, correlación aire↔tráfico colapsable
-- `tabs/prediction.py` -- real vs. predicho del modelo ganador de fase 4,
-  sin reentrenar nada
+- `interface.py` -- entry point, wires 4 tabs
+- `components/` -- reusable pieces: `filters.py` (dropdown options),
+  `map.py` (choropleth + markers + color scales), `kpi.py` (KPI card text),
+  `resumen.py` (summary tab)
+- `tabs/overview.py` -- interactive dashboard: shared filters, KPIs,
+  map, temporal evolution, collapsible air↔traffic correlation
+- `tabs/resumen.py` -- catalog summary tab (districts/stations/points, coverage)
+- `tabs/tabla.py` -- daily readings table, filterable by station
+- `tabs/prediction.py` -- real history + future prediction per station,
+  reads from `data/gold/ml/pred_<gas>_<N>m.parquet` (written by
+  `python -m src.ml.main`); no retraining

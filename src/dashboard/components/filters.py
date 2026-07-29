@@ -1,4 +1,4 @@
-"""Opciones para los desplegables del dashboard -- sin lógica de negocio."""
+"""Options for dashboard dropdowns -- no business logic."""
 
 from src.data.access.queries import (
     TRAFFIC_VARIABLES,
@@ -9,15 +9,14 @@ from src.data.access.queries import (
     get_traffic_periods_by_district,
 )
 
-TRAFFIC_POINTS_PATH = "data/bronze/trafico_puntos_medida/*.parquet"
-AIRQUALITY_PATH = "data/silver/aire/all.parquet"
-TRAFFIC_PATH = "data/silver/trafico/all.parquet"
-ESTACIONES_DISTRITO_PATH = "data/silver/estaciones_aire/latest.parquet"
+TRAFFIC_POINTS_PATH = "data/gold/dim_punto_trafico.parquet"
+AIRQUALITY_PATH = "data/silver/aire.parquet"
+TRAFFIC_PATH = "data/silver/trafico.parquet"
+ESTACIONES_DISTRITO_PATH = "data/silver/estaciones_aire.parquet"
 
 AIR_VARIABLES = ["NO2", "PM10", "PM2.5", "O3", "NOx"]
 
-# Rango completo -- estado inicial de los desplegables y fallback si una
-# combinación filtro no tiene ningún periodo con datos.
+# Full range -- initial state of dropdowns and fallback if a filter combo has no periods with data.
 ANIOS_FALLBACK = [2020, 2021, 2022, 2023, 2024]
 MESES_FALLBACK = list(range(1, 13))
 
@@ -28,19 +27,17 @@ UNITS = {
 
 
 def obtener_distritos(dominio=None, variable=None):
-    """Tráfico: los 21 distritos siempre (los puntos los cubren todos).
+    """Traffic: always 21 districts (points cover all).
 
-    Aire: si hay gas elegido, solo los distritos con lectura real de ese
-    gas -- si no hay ninguno (hueco de datos), cae a la lista completa
-    antes que dejar el desplegable vacío.
+    Air: if gas chosen, only districts with real readings of that gas --
+    if none (data gap), falls back to full list rather than empty dropdown.
     """
     if dominio == "Aire" and variable:
         disponibles = get_air_districts_by_variable(
             AIRQUALITY_PATH, ESTACIONES_DISTRITO_PATH, variable
         )
-        # COD_DIS es VARCHAR sin cero a la izquierda ("1", no "01") -- se
-        # normaliza a int para que el desplegable no mezcle tipos con la
-        # lista de tráfico (que ya viene en int).
+        # COD_DIS is VARCHAR without leading zero ("1", not "01") -- normalized
+        # to int so dropdown doesn't mix types with traffic list (already int).
         return sorted(int(d) for d in disponibles) or get_traffic_districts(
             TRAFFIC_POINTS_PATH
         )
@@ -48,11 +45,10 @@ def obtener_distritos(dominio=None, variable=None):
 
 
 def obtener_variables(dominio, distrito=None):
-    """Tráfico: las 4 variables siempre (mismo esquema en todo punto).
+    """Traffic: always 4 variables (same schema at every point).
 
-    Aire: si hay distrito elegido, solo los gases con lectura real ahí --
-    si no hay ninguno (hueco de datos), se cae de vuelta a la lista
-    completa antes que dejar el desplegable vacío.
+    Air: if district chosen, only gases with real readings there --
+    if none (data gap), falls back to full list rather than empty dropdown.
     """
     if dominio != "Aire":
         return sorted(TRAFFIC_VARIABLES)
@@ -75,10 +71,10 @@ def _periodos_disponibles(dominio, variable, distrito):
 
 
 def obtener_anios(dominio, variable, distrito):
-    """Años con al menos un dato real para dominio/variable/distrito.
+    """Years with at least one real data point for domain/variable/district.
 
-    Sin distrito/variable elegidos (arranque de la app) cae al rango
-    completo -- igual que si la combinación no tiene ningún dato.
+    Without district/variable chosen (app startup) falls to full range --
+    same as if combo has no data.
     """
     if not variable or not distrito:
         return ANIOS_FALLBACK
@@ -87,7 +83,7 @@ def obtener_anios(dominio, variable, distrito):
 
 
 def obtener_meses(dominio, variable, distrito, anio):
-    """Meses con al menos un dato real para ese año, dentro de dominio/variable/distrito."""
+    """Months with at least one real data point for that year, within domain/variable/district."""
     if not variable or not distrito or not anio:
         return MESES_FALLBACK
     meses = sorted(

@@ -1,62 +1,111 @@
-"""Real vs. predicted (held-out fold) for the fase-4 winner model. No retraining here."""
+"""Forecast of the next N months per station. Reads gold, never trains.
+
+`python -m src.ml.main` writes data/gold/ml/pred_<gas>_<N>m.parquet; this tab
+only plots it next to the real history it continues.
+"""
 
 import json
+import re
 from pathlib import Path
 
+import duckdb
 import matplotlib.pyplot as plt
 import pandas as pd
 
-MODELS_DIR = "data/gold"
+ML_DIR = Path("data/gold/ml")
+FACT_AIR_PATH = "data/gold/fact_calidad_aire.parquet"
+
+# ponytail: show the longest horizon on disk. A 1-month and a 2-month run
+# coexist as separate files; add a horizon selector only if you want both at once.
+_PATRON = re.compile(r"^pred_(?P<gas>.+)_(?P<meses>\d+)m$")
 
 
-def _latest_year(variable):
-    """Newest year available for `variable`, so a retrain with more history
-    never gets shadowed by an older path hardcoded somewhere."""
-    years = [
-        int(p.stem.removeprefix(f"ml_{variable}_").removesuffix("_holdout"))
-        for p in Path(MODELS_DIR).glob(f"ml_{variable}_*_holdout.parquet")
-    ]
-    return max(years)
+def _runs() -> dict[str, tuple[int, Path]]:
+    """gas -> (meses, ruta) for the longest horizon available per gas."""
+    encontrados: dict[str, tuple[int, Path]] = {}
+    for ruta in ML_DIR.glob("pred_*m.parquet"):
+        casa = _PATRON.match(ruta.stem)
+        if not casa:
+            continue
+        gas, meses = casa["gas"], int(casa["meses"])
+        if meses > encontrados.get(gas, (0, None))[0]:
+            encontrados[gas] = (meses, ruta)
+    return encontrados
 
 
-def _holdout(variable):
-    stem = f"ml_{variable}_{_latest_year(variable)}"
-    df = pd.read_parquet(Path(MODELS_DIR) / f"{stem}_holdout.parquet")
-    partition_col = next(
-        c for c in df.columns if c not in ("fecha", "actual", "predicted")
-    )
-    return df, partition_col
+def gases_disponibles() -> list[str]:
+    return sorted(_runs())
 
 
-def obtener_estaciones_prediccion(variable):
-    df, partition_col = _holdout(variable)
-    return sorted(df[partition_col].unique().tolist())
+def obtener_estaciones_prediccion(gas: str) -> list[int]:
+    meses, ruta = _runs()[gas]
+    return sorted(pd.read_parquet(ruta)["estacion"].unique().tolist())
 
 
-def graficar_prediccion(variable, estacion_id):
-    df, partition_col = _holdout(variable)
-    df = df[df[partition_col] == estacion_id].sort_values("fecha")
+def graficar_prediccion(gas: str, estacion_id):
+    meses, ruta = _runs()[gas]
+    pred = pd.read_parquet(ruta)
+    pred = pred[pred["estacion"] == int(estacion_id)].sort_values("fecha")
+
+    real = duckdb.sql(
+        f"""
+        SELECT fecha, dato FROM '{FACT_AIR_PATH}'
+        WHERE magnitud = ? AND estacion = ? ORDER BY fecha
+        """,
+        params=[gas, int(estacion_id)],
+    ).df()
 
     fig, ax = plt.subplots(figsize=(14, 6))
-    ax.plot(df["fecha"], df["actual"], linestyle="-", color="b", label="Real")
-    ax.plot(df["fecha"], df["predicted"], linestyle="--", color="r", label="Predicho")
-    ax.set_title(f"Real vs. predicho — {variable} — {partition_col} {estacion_id}")
-    ax.set_xlabel("Fecha")
-    ax.set_ylabel(variable)
-    ax.legend()
-    ax.grid(True)
-    fig.autofmt_xdate(rotation=45)
+    ax.plot(real["fecha"], real["dato"], color="b", linewidth=0.8, label="Real")
 
+    if not real.empty:
+        ultima_fecha_real = pd.to_datetime(real["fecha"]).max()
+        ultima_dato_real = real[pd.to_datetime(real["fecha"]) == ultima_fecha_real]["dato"].iloc[0]
+        pred_continuo_x = pd.concat([
+            pd.Series([ultima_fecha_real]),
+            pd.to_datetime(pred["fecha"])
+        ]).reset_index(drop=True)
+        pred_continuo_y = pd.concat([
+            pd.Series([ultima_dato_real]),
+            pd.Series(pred["valor_predicho"].values)
+        ]).reset_index(drop=True)
+        ax.plot(
+            pred_continuo_x,
+            pred_continuo_y,
+            color="r",
+            linestyle="--",
+            label=f"Predicho ({meses} mes/es)",
+        )
+        ax.axvline(ultima_fecha_real, color="grey", linestyle=":")
+    else:
+        ax.plot(
+            pd.to_datetime(pred["fecha"]),
+            pred["valor_predicho"],
+            color="r",
+            linestyle="--",
+            label=f"Predicho ({meses} mes/es)",
+        )
+
+    ax.set_title(f"{gas} — estación {estacion_id} — histórico y predicción")
+    ax.set_xlabel("Fecha")
+    ax.set_ylabel(gas)
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    fig.autofmt_xdate(rotation=45)
     return fig
 
 
-def metricas_texto(variable):
-    stem = f"ml_{variable}_{_latest_year(variable)}"
-    with open(Path(MODELS_DIR) / f"{stem}_metrics.json", encoding="utf-8") as f:
-        data = json.load(f)
-    winner = data["winner"]
-    row = next(r for r in data["comparison"] if r["model"] == winner)
+def metricas_texto(gas: str) -> str:
+    meses, _ = _runs()[gas]
+    with open(ML_DIR / f"metrics_{gas}_{meses}m.json", encoding="utf-8") as f:
+        datos = json.load(f)
+
+    tabla = "\n".join(
+        f"| {fila['modelo']} | {fila['mae']:.2f} | {fila['rmse']:.2f} |"
+        for fila in datos["comparativa"]
+    )
     return (
-        f"**Ganador:** {winner} — MAE {row['mae']:.2f}, "
-        f"RMSE {row['rmse']:.2f}, MAPE {row['mape']:.2%}"
+        f"**Ganador:** `{datos['ganador']}` — horizonte {meses} mes(es) "
+        f"desde {datos['ultima_fecha_real']}\n\n"
+        f"| modelo | MAE | RMSE |\n|---|---|---|\n{tabla}"
     )

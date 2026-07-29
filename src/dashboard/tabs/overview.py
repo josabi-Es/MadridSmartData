@@ -1,4 +1,4 @@
-"""Dashboard interactivo: filtros compartidos, KPIs, mapa, evolución, correlación."""
+"""Interactive dashboard: shared filters, KPIs, map, evolution, correlation."""
 
 import matplotlib
 
@@ -15,10 +15,10 @@ from src.data.access.queries import (
     daily_average_traffic_by_district,
 )
 
-AIRQUALITY_PATH = "data/silver/aire/all.parquet"
-TRAFFIC_PATH = "data/silver/trafico/all.parquet"
-ESTACIONES_DISTRITO_PATH = "data/silver/estaciones_aire/latest.parquet"
-TRAFFIC_POINTS_PATH = "data/bronze/trafico_puntos_medida/*.parquet"
+AIRQUALITY_PATH = "data/silver/aire.parquet"
+TRAFFIC_PATH = "data/silver/trafico.parquet"
+ESTACIONES_DISTRITO_PATH = "data/silver/estaciones_aire.parquet"
+TRAFFIC_POINTS_PATH = "data/gold/dim_punto_trafico.parquet"
 
 
 def _empty_fig(mensaje):
@@ -30,9 +30,9 @@ def _empty_fig(mensaje):
 
 
 def graficar_evolucion(dominio, variable, distrito):
-    """Serie diaria de `variable` para el distrito elegido, todo el histórico."""
+    """Daily series of `variable` for chosen district, all history."""
     if not distrito:
-        return _empty_fig("Elige un distrito para ver la evolución")
+        return _empty_fig("Select a district to see the evolution")
 
     if dominio == "Aire":
         rows = daily_average_air_by_district(
@@ -43,15 +43,15 @@ def graficar_evolucion(dominio, variable, distrito):
             TRAFFIC_PATH, TRAFFIC_POINTS_PATH, variable, str(distrito)
         )
     if not rows:
-        return _empty_fig("Sin datos para esta combinación")
+        return _empty_fig("No data for this combination")
 
     fechas = [r[0] for r in rows]
     medias = [r[1] for r in rows]
     fig, ax = plt.subplots(figsize=(14, 4))
     ax.plot(fechas, medias, linestyle="-", color="teal")
-    ax.set_title(f"Evolución diaria — {variable} — distrito {distrito}")
+    ax.set_title(f"Daily evolution — {variable} — district {distrito}")
     ax.set_xlabel("Fecha")
-    ax.set_ylabel(f"{variable} ({UNITS.get(variable, 'sin unidad')})")
+    ax.set_ylabel(f"{variable} ({UNITS.get(variable, 'unitless')})")
     ax.grid(True)
     fig.autofmt_xdate(rotation=45)
     plt.close(fig)
@@ -59,9 +59,9 @@ def graficar_evolucion(dominio, variable, distrito):
 
 
 def graficar_correlacion(gas, variable_trafico, distrito):
-    """Gas vs. variable de tráfico superpuestos, mismo distrito, doble eje Y."""
+    """Gas vs. traffic variable overlaid, same district, dual Y-axis."""
     if not distrito:
-        return _empty_fig("Elige un distrito para ver la correlación")
+        return _empty_fig("Select a district to see the correlation")
 
     poll_rows = daily_average_air_by_district(
         AIRQUALITY_PATH, ESTACIONES_DISTRITO_PATH, gas, str(distrito)
@@ -70,13 +70,13 @@ def graficar_correlacion(gas, variable_trafico, distrito):
         TRAFFIC_PATH, TRAFFIC_POINTS_PATH, variable_trafico, str(distrito)
     )
     if not poll_rows or not trafico_rows:
-        return _empty_fig("Sin datos suficientes para cruzar aire y tráfico")
+        return _empty_fig("Not enough data to cross air and traffic")
 
     df_poll = pd.DataFrame(poll_rows, columns=["fecha_dia", "media_gas"])
     df_trafico = pd.DataFrame(trafico_rows, columns=["fecha_dia", "media_trafico"])
     df_joined = df_poll.merge(df_trafico, on="fecha_dia", how="inner")
     if df_joined.empty:
-        return _empty_fig("Sin fechas en común entre aire y tráfico")
+        return _empty_fig("No common dates between air and traffic")
 
     df_joined["fecha_dia"] = pd.to_datetime(df_joined["fecha_dia"])
     df_joined = df_joined.sort_values("fecha_dia")
@@ -91,9 +91,9 @@ def graficar_correlacion(gas, variable_trafico, distrito):
         label=variable_trafico,
     )
     ax1.set_xlabel("Fecha")
-    ax1.set_ylabel(f"{gas} ({UNITS.get(gas, 'sin unidad')})", color="crimson")
+    ax1.set_ylabel(f"{gas} ({UNITS.get(gas, 'unitless')})", color="crimson")
     ax2.set_ylabel(
-        f"{variable_trafico} ({UNITS.get(variable_trafico, 'sin unidad')})",
+        f"{variable_trafico} ({UNITS.get(variable_trafico, 'unitless')})",
         color="royalblue",
     )
     ax1.tick_params(axis="y", labelcolor="crimson")
@@ -106,7 +106,7 @@ def graficar_correlacion(gas, variable_trafico, distrito):
 
 
 def refrescar(dominio, variable, distrito, anio, mes):
-    """Un único punto de refresco: leyenda, mapa de colores, KPIs y línea de evolución."""
+    """Single refresh point: legend, color map, KPIs and evolution line."""
     leyenda = generar_leyenda_html(variable)
     mapa_colores = generar_mapa_colores_html(dominio, variable, anio, mes)
     conteos = kpi_conteos_texto(distrito)

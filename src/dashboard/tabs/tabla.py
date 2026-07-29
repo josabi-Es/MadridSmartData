@@ -1,4 +1,4 @@
-"""Pestaña Tabla: lecturas diarias de un gas, filtrable por estación."""
+"""Table tab: daily readings of a gas, filterable by station."""
 
 import pandas as pd
 
@@ -9,7 +9,7 @@ from src.data.access.queries import (
     get_stations,
 )
 
-AIRQUALITY_PATH = "data/silver/aire/*.parquet"
+AIRQUALITY_PATH = "data/silver/aire.parquet"
 
 COLUMNAS = ["Fecha", "Valor"]
 
@@ -19,14 +19,14 @@ def obtener_estaciones_tabla():
 
 
 def obtener_magnitudes_tabla(estacion_id):
-    """Solo los gases que esa estación mide de verdad (ya filtrado en queries)."""
+    """Only gases that station actually measures (already filtered in queries)."""
     return get_magnitudes(AIRQUALITY_PATH, estacion_id)
 
 
 def unidad_texto(magnitud):
     if not magnitud:
         return ""
-    return f"Unidad: {UNITS.get(magnitud, 'sin unidad')}"
+    return f"Unit: {UNITS.get(magnitud, 'unitless')}"
 
 
 def tabla_diaria(estacion_id, magnitud):

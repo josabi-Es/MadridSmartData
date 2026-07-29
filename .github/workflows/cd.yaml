@@ -29,4 +29,4 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           body: "Release ${{ steps.version.outputs.tag }}"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}

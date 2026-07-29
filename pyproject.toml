@@ -15,7 +15,7 @@ dependencies = [
     "matplotlib==3.9.4",
     "pyarrow>=24.0.0",
     "shapely==2.0.7",
-    "pywin32>=312",
+    "pywin32>=312; sys_platform == 'win32'",
 ]
 
 # ingest (CKAN API) + training -- not imported by src/dashboard, so a
@@ -37,10 +37,6 @@ dev = [
     "ruff>=0.6.0",
 ]
 
-# Without this, `uv run` syncs to the base deps only and uninstalls the
-# pipeline extra -- `import src.ml.models` then fails on statsmodels.
-[tool.uv]
-default-extras = ["pipeline"]
 
 [tool.ruff]
 line-length = 88

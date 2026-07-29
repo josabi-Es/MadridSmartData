@@ -1306,7 +1306,7 @@ dependencies = [
     { name = "huggingface-hub" },
     { name = "matplotlib" },
     { name = "pyarrow" },
-    { name = "pywin32" },
+    { name = "pywin32", marker = "sys_platform == 'win32'" },
     { name = "shapely" },
 ]
 
@@ -1342,7 +1342,7 @@ requires-dist = [
     { name = "matplotlib", specifier = "==3.9.4" },
     { name = "papermill", marker = "extra == 'pipeline'", specifier = ">=2.6.0" },
     { name = "pyarrow", specifier = ">=24.0.0" },
-    { name = "pywin32", specifier = ">=312" },
+    { name = "pywin32", marker = "sys_platform == 'win32'", specifier = ">=312" },
     { name = "requests", marker = "extra == 'pipeline'", specifier = ">=2.31.0" },
     { name = "scikit-learn", marker = "extra == 'pipeline'", specifier = ">=1.5.0" },
     { name = "shapely", specifier = "==2.0.7" },

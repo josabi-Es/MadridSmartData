@@ -1,6 +1,7 @@
 """DuckDB read-only queries over processed Parquet, replacing the Spark reads."""
 
 import functools
+
 import duckdb
 
 

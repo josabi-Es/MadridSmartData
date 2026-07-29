@@ -51,6 +51,8 @@ select = ["E", "F", "I", "N"]
 "src/old_preprocessing/**" = ["E501", "N802", "N806", "N816"]
 # Dashboard: long lines from UI literals (color tables, folium markup).
 "src/dashboard/**" = ["E501"]
+# queries.py: stdlib + third-party imports together (functools + duckdb)
+"src/data/access/queries.py" = ["I"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

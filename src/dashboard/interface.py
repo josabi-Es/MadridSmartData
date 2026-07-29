@@ -1,6 +1,6 @@
-import gradio as gr
-
 import os
+
+import gradio as gr
 from dotenv import load_dotenv
 
 from src.dashboard.components.filters import (
@@ -8,10 +8,6 @@ from src.dashboard.components.filters import (
     obtener_distritos,
     obtener_variables,
 )
-
-load_dotenv()
-ANIOS_FALLBACK = list(range(int(os.getenv("INGEST_YEAR_START", "2023")), int(os.getenv("INGEST_YEAR_END", "2025")) + 1))
-MESES_FALLBACK = list(range(1, 13))
 from src.dashboard.tabs.overview import (
     graficar_correlacion,
     refrescar,
@@ -31,6 +27,10 @@ from src.dashboard.tabs.tabla import (
     unidad_texto,
 )
 from src.data.access.queries import TRAFFIC_VARIABLES
+
+load_dotenv()
+ANIOS_FALLBACK = list(range(int(os.getenv("INGEST_YEAR_START", "2023")), int(os.getenv("INGEST_YEAR_END", "2025")) + 1))
+MESES_FALLBACK = list(range(1, 13))
 
 with gr.Blocks() as demo:
     with gr.Tabs():

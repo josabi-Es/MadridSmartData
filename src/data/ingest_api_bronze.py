@@ -2,17 +2,23 @@
 
 import argparse
 import json
+import os
 import shutil
 import time
 import zipfile
+from datetime import date
 from pathlib import Path
 from typing import Callable, TypeVar
 
 import duckdb
 import geopandas as gpd
 import requests
+from dotenv import load_dotenv
 
 from src.data.bronze.ckan import fetch_resources
+from src.utils.logger_config import logger
+
+load_dotenv()
 
 T = TypeVar("T")
 
@@ -23,12 +29,9 @@ TRAFFIC_TYPES = {
     "vmed": "DOUBLE",
 }
 
-# datos.madrid.es exports CSV as ISO-8859-1 (latin-1), not UTF-8 -- some
-# months/resources happen to have no accented bytes and would decode fine
-# either way, but others (station/street names) don't. latin-1 decodes any
-# byte sequence without raising, so it's the safe default for every direct
-# ingest from this portal.
-_MADRID_OPEN_DATA_ENCODING = "latin-1"
+# datos.madrid.es has used both latin-1 and UTF-8. csv_to_parquet tries
+# multiple encodings automatically, so this is now None (let it detect).
+_MADRID_OPEN_DATA_ENCODING = None
 
 SPANISH_MONTHS = [
     "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -66,20 +69,31 @@ def csv_to_parquet(
 ) -> int:
     """Stream a CSV (local path or URL) into a Parquet file via DuckDB.
 
-    Returns the row count written.
+    Returns the row count written. Tries multiple encodings if the first fails.
     """
     con = duckdb.connect()
     con.install_extension("httpfs")
     con.load_extension("httpfs")
-    read_args = (
-        f"'{csv_source}', sep=';', encoding={encoding or 'UTF-8'!r}, "
-        "allow_quoted_nulls=true"
-    )
-    if types:
-        read_args += f", types={types!r}"
-    select = f"SELECT * FROM read_csv_auto({read_args})"
-    con.execute(f"COPY ({select}) TO '{out_path}' (FORMAT PARQUET)")
-    return con.execute(f"SELECT count(*) FROM '{out_path}'").fetchone()[0]
+
+    encodings = [encoding] if encoding else ["utf-8", "latin-1"]
+    last_error = None
+
+    for enc in encodings:
+        try:
+            read_args = (
+                f"'{csv_source}', sep=';', encoding={enc!r}, "
+                "allow_quoted_nulls=true"
+            )
+            if types:
+                read_args += f", types={types!r}"
+            select = f"SELECT * FROM read_csv_auto({read_args})"
+            con.execute(f"COPY ({select}) TO '{out_path}' (FORMAT PARQUET)")
+            return con.execute(f"SELECT count(*) FROM '{out_path}'").fetchone()[0]
+        except Exception as e:
+            last_error = e
+            continue
+
+    raise last_error
 
 
 def shapefile_to_parquet(source: str, out_path: str) -> int:
@@ -239,27 +253,80 @@ def ingest_traffic_month(month: str, out_dir: str, work_dir: str) -> int:
     return row_count
 
 
+DATASET_CHOICES = [
+    "aire", "trafico", "estaciones_aire", "trafico_puntos_medida", "distritos"
+]  # fmt: skip
+
+
+def run_dataset(dataset: str, years: str | None) -> tuple[int, str]:
+    """Ingest one dataset (single year/month, or snapshot). Returns (rows, out_file)."""
+    out_dir = f"data/bronze/{dataset}"
+    if dataset == "distritos":
+        return ingest_districts(out_dir), "latest.parquet"
+    if dataset == "estaciones_aire":
+        return ingest_snapshot(dataset, out_dir), "latest.parquet"
+    if dataset == "trafico":
+        n = ingest_traffic_month(years, out_dir, work_dir=f"{out_dir}/_tmp")
+        return n, f"{years}.parquet"
+    if dataset == "trafico_puntos_medida":
+        return ingest_month_snapshot(dataset, years, out_dir), f"{years}.parquet"
+    return ingest_year(dataset, years, out_dir), f"{years}.parquet"
+
+
+def _run_dataset_safe(dataset: str, years: str | None) -> None:
+    """Same as run_dataset, but logs and continues instead of aborting the batch.
+
+    A historical backfill spans many year/month combos -- one month with no
+    published resource yet (or a transient API hiccup after retries) should
+    not kill the other 80+ calls in the same run.
+    """
+    try:
+        n, out_file = run_dataset(dataset, years)
+        logger.info(
+            f"{dataset} {years or ''}: {n} filas -> data/bronze/{dataset}/{out_file}"
+        )
+    except Exception as e:
+        logger.warning(f"{dataset} {years or ''}: fallo, se salta -- {e}")
+
+
+def ingest_all_from_env() -> None:
+    """Ingest every dataset for the year range configured in .env.
+
+    Driven by INGEST_YEAR_START/INGEST_YEAR_END (default 2019 -> current
+    year) so a single `python -m src.data.ingest_api_bronze` (no args)
+    does the full historical backfill instead of one command per
+    dataset/year/month. Snapshots (distritos/estaciones_aire) run once;
+    aire loops per year; trafico/trafico_puntos_medida loop per year-month
+    (12 calls/year each).
+    """
+    start = int(os.getenv("INGEST_YEAR_START", "2019"))
+    end = int(os.getenv("INGEST_YEAR_END", str(date.today().year)))
+    logger.info(f"Ingesta completa {start}-{end}")
+
+    _run_dataset_safe("distritos", None)
+    _run_dataset_safe("estaciones_aire", None)
+
+    for year in range(start, end + 1):
+        _run_dataset_safe("aire", str(year))
+        for month in range(1, 13):
+            year_month = f"{year}-{month:02d}"
+            _run_dataset_safe("trafico", year_month)
+            _run_dataset_safe("trafico_puntos_medida", year_month)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    choices = [
-        "aire", "trafico", "estaciones_aire", "trafico_puntos_medida", "distritos"
-    ]  # fmt: skip
-    parser.add_argument("--dataset", required=True, choices=choices)
+    parser.add_argument(
+        "--dataset",
+        choices=DATASET_CHOICES,
+        help="omit with --years to ingest everything per .env (INGEST_YEAR_START/END)",
+    )
     parser.add_argument("--years", help="2024 / 2024-01, omit for a snapshot dataset")
     args = parser.parse_args()
 
-    out_dir = f"data/bronze/{args.dataset}"
-    if args.dataset == "distritos":
-        n, out_file = ingest_districts(out_dir), "latest.parquet"
-    elif args.dataset == "estaciones_aire":
-        n, out_file = ingest_snapshot(args.dataset, out_dir), "latest.parquet"
-    elif args.dataset == "trafico":
-        n = ingest_traffic_month(args.years, out_dir, work_dir=f"{out_dir}/_tmp")
-        out_file = f"{args.years}.parquet"
-    elif args.dataset == "trafico_puntos_medida":
-        n = ingest_month_snapshot(args.dataset, args.years, out_dir)
-        out_file = f"{args.years}.parquet"
+    if args.dataset is None:
+        ingest_all_from_env()
     else:
-        n = ingest_year(args.dataset, args.years, out_dir)
-        out_file = f"{args.years}.parquet"
-    print(f"{args.dataset}: {n} rows -> {out_dir}/{out_file}")
+        rows, written_file = run_dataset(args.dataset, args.years)
+        out_dir = f"data/bronze/{args.dataset}"
+        print(f"{args.dataset}: {rows} rows -> {out_dir}/{written_file}")

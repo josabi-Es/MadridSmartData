@@ -1,0 +1,80 @@
+# Catálogo vivo de data/gold/. Una entrada por tabla: grano, clave natural,
+# columnas, script que la genera, cadencia de refresco esperada. Sirve para
+# detectar schema drift comparando contra el DESCRIBE real de DuckDB (test
+# pendiente, no implementado esta fase).
+
+dim_distrito:
+  grano: un distrito
+  clave_natural: COD_DIS
+  columnas:
+    COD_DIS: VARCHAR
+    NOMBRE: VARCHAR
+    geometry: GEOMETRY
+    n_estaciones_aire: BIGINT
+    n_puntos_trafico: BIGINT
+    cobertura_aire: BOOLEAN
+  script: src/data/gold/dimensions.py::build_dim_distrito
+  refresco_esperado: al reingestar distritos/estaciones/puntos (poco frecuente)
+
+dim_estacion_aire:
+  grano: una estación de calidad del aire
+  clave_natural: CODIGO_CORTO
+  columnas:
+    CODIGO_CORTO: BIGINT
+    ESTACION: VARCHAR
+    LONGITUD: DOUBLE
+    LATITUD: DOUBLE
+    COD_DIS: VARCHAR
+    NOMBRE: VARCHAR
+  script: src/data/gold/dimensions.py::build_dim_estacion_aire
+  refresco_esperado: al reingestar estaciones_aire (poco frecuente)
+
+dim_punto_trafico:
+  grano: un punto de medida de tráfico
+  clave_natural: id
+  columnas:
+    id: BIGINT
+    distrito: BIGINT
+    tipo_elem: VARCHAR
+    nombre: VARCHAR
+    longitud: DOUBLE
+    latitud: DOUBLE
+  script: src/data/gold/dimensions.py::build_dim_punto_trafico
+  refresco_esperado: al reingestar trafico_puntos_medida (poco frecuente)
+
+dim_magnitud:
+  grano: un tipo de gas medido
+  clave_natural: codigo
+  columnas:
+    codigo: INTEGER
+    magnitud: VARCHAR
+  script: src/data/gold/dimensions.py::build_dim_magnitud
+  refresco_esperado: estático, no cambia salvo nueva magnitud oficial
+
+fact_calidad_aire:
+  grano: estación x fecha x magnitud
+  clave_natural: [estacion, fecha, magnitud]
+  columnas:
+    estacion: BIGINT
+    cod_dis: VARCHAR
+    magnitud: VARCHAR
+    fecha: DATE
+    dato: DOUBLE
+    validez: VARCHAR
+  script: src/data/gold/facts.py::build_fact_calidad_aire
+  refresco_esperado: diario, tras cada re-ejecución de silver/aire
+
+fact_trafico:
+  grano: punto x fecha
+  clave_natural: [id, fecha]
+  columnas:
+    id: BIGINT
+    distrito: BIGINT
+    fecha: TIMESTAMP
+    intensidad: DOUBLE
+    ocupacion: DOUBLE
+    carga: DOUBLE
+    vmed: DOUBLE
+    error: VARCHAR
+  script: src/data/gold/facts.py::build_fact_trafico
+  refresco_esperado: diario, tras cada re-ejecución de silver/trafico

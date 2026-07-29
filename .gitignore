@@ -35,6 +35,10 @@ data/*
 
 src/visualization/
 
+# Legacy code, kept locally for reference only, deleted once phase 2/3 close
+src/old_ingest/
+src/old_preprocessing/
+
 # But do not ignore the README.md
 !data/README.md
 
@@ -54,3 +58,13 @@ tmp/
 # Ignore Docker Compose override files
 docker-compose.override.yml
 docker-compose.override.*
+
+# Claude
+.claude/
+CLAUDE.md
+spec/
+spec.md
+
+# Auxiliary files
+summary.md
+ml.md

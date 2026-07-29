@@ -7,21 +7,17 @@ install:
 test:
 	uv run pytest
 
-# Un dataset/año de ejemplo -- ver data/README.md para el resto de comandos.
 ingest:
-	uv run python -m src.data.bronze.pipeline --dataset distritos
-	uv run python -m src.data.bronze.pipeline --dataset estaciones_aire
-	uv run python -m src.data.bronze.pipeline --dataset trafico_puntos_medida --years 2024-12
-	uv run python -m src.data.bronze.pipeline --dataset aire --years 2024
-	uv run python -m src.data.bronze.pipeline --dataset trafico --years 2024-01
+	uv run python -m src.data.ingest_api_bronze
 
 pipeline:
-	uv run python -m src.data.run_pipeline
+	uv run python -m src.data.preprocessing_bronze_gold
 
 train:
-	uv run python -m src.ml.train
+	uv run python -m src.ml.main
 
 dashboard:
+g
 	uv run python -m src.dashboard.interface
 
 airflow-up:
@@ -30,8 +26,8 @@ airflow-up:
 airflow-down:
 	docker compose down
 
-train-dag: ## Dispara el DAG de reentreno (20 notebooks en paralelo + promoción)
+train-dag: 
 	docker compose exec airflow airflow dags trigger retrain_forecast
 
-clean: ## Borra cachés locales y notebooks ejecutados (no toca data/*.parquet)
+clean: 
 	uv run python -m src.ml.notebooks.clean_cache

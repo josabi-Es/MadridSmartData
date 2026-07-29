@@ -12,6 +12,8 @@ services:
       PYTHONPATH: /opt/repo
       AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER:-admin}
       AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
+      INGEST_YEAR_START: ${INGEST_YEAR_START:-2023}
+      INGEST_YEAR_END: ${INGEST_YEAR_END:-2025}
     volumes:
       - airflow_home:/opt/airflow
       - .:/opt/repo

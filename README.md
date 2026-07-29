@@ -50,11 +50,19 @@ Two services, two ports:
 Trigger sequence in the Airflow UI (`Trigger DAG w/ config`):
 
 1. **`daily_ingest`** first: pulls a year/month from the CKAN API into
-   `bronze/`, then runs `src/data/run_pipeline.py` (silver → gold dims/facts).
-2. **`train_forecast`** after, only once there's data: retrains the
-   forecasting models onto `gold/`.
+   `bronze/`, then runs `src/data/preprocessing_bronze_gold.py` (silver → gold dims/facts).
+2. **`retrain_forecast`** after, only once there's data: forecasts the next
+   `predict_months` into `gold/ml/`.
 
-![airflow](docs/airflow.png)
+## Monitoring
+
+Expected DAG status on success (all tasks green):
+
+<img src="docs/airflow_completed.png" width="900" />
+
+If a task fails in `bronze`, it cascades to `silver` and `gold`:
+
+<img src="docs/airflow_error.png" width="900" />
 
 ## Dashboard cli
 
@@ -67,39 +75,35 @@ uv run python -m src.dashboard.interface
 
 ## CI/CD
 
-**CI**: en cada `push`/merge a `main` (nunca en ramas o PRs sueltos) se
-corre `ruff check` + `pytest` vía GitHub Actions (`.github/workflows/ci-cd.yml`).
+Every merge to `main` triggers:
 
-**CD**: no hay despliegue real todavía — se simula. Un commit *breaking*
-(Conventional Commits: `feat!: ...` o footer `BREAKING CHANGE: ...`) crea
-automáticamente una rama `release-v{N}` a partir de `main`, numerada de
-forma secuencial (`release-v1`, `release-v2`, ...). Esa sería la rama que
-un servidor de producción leería siempre — la más alta es la más
-actualizada. Un `feat:`/`fix:` normal solo deja `main` en verde, sin crear
-rama nueva.
+1. **CI** (automated tests): `ruff check` + `pytest` via GitHub Actions
+2. **CD** (automated release): if all tests pass, a new release is created
+   automatically with a sequential version number (`release-v1`,
+   `release-v2`, `release-v3`, ...). A production server would always read
+   the highest release number to know which version is current.
 
-Para dispararlo al hacer *squash merge* de un PR: el mensaje del commit de
-squash es por defecto el título del PR (editable en la caja de merge) —
-ahí va el `!` (`feat!: cambia el esquema de X`), o si se prefiere no tocar
-el título, una línea `BREAKING CHANGE: ...` en el cuerpo de esa misma caja.
-
-```mermaid
-flowchart LR
-    A[push / squash-merge a main] --> B[CI: ruff check + pytest]
-    B -->|falla| X((main queda rojo))
-    B -->|ok| C{commit breaking?}
-    C -->|no: feat/fix normal| D((main queda verde))
-    C -->|sí: feat!/BREAKING CHANGE| E[crear release-v N+1]
-    E --> F[(producción lee siempre\nla release-v más alta)]
-```
-
-`release-please-config.json` / `.release-please-manifest.json` declaran la
-política de versionado (semver por Conventional Commits); en esta
-simulación no se invoca la action real de `release-please` — el paso de
-arriba reproduce directamente su efecto (detectar breaking → nueva
-versión).
+If a merge contains a **breaking change** (a significant change that affects
+compatibility), the release version increments accordingly. Otherwise, a
+regular release is created with the same version scheme.
 
 ---
 
-More structure and convention detail lives in `CLAUDE.md` (gitignored,
-local project memory — not needed to run anything above).
+## What this project enables
+
+- **Automate everything with Airflow**: daily ingestion and model retraining
+  run as DAGs — programmable on a real server, no manual execution needed.
+- **Interactive visualization of stations and traffic points**: map with all
+  24 air quality stations and thousands of traffic measurement points,
+  filterable by district.
+- **Spot high pollution levels at a glance**: the map colors each district
+  by its monthly average (green → red), so you see instantly which districts
+  and months exceed safe thresholds.
+- **Forecast the next months**: a trained model estimates how each variable
+  (NO2, O3...) will evolve in the future, per station.
+
+### Demo
+
+<video src="docs/summary.mp4" controls width="700"></video>
+
+---

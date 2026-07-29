@@ -1,42 +1,34 @@
+<div align="center">
+<img src="https://skillicons.dev/icons?i=python,duckdb,airflow,docker,git,sklearn,pandas&theme=light" />
+<br/>
+</div>
 
-## Instructions
+# data/
 
-## Folder Structure
+Not tracked in git (only this README is). Everything here is generated
+locally by the pipeline scripts — nothing is downloaded by hand.
 
 ```
 data/
-├── raw/
-│   ├── air_quality_data/        # Daily air quality records since 2001
-│   ├── air_quality_sensors/     # Metadata about air quality stations
-│   ├── traffic_data/            # Historical traffic measurements since 2013
-│   └── traffic_sensors/         # Metadata for traffic sensors
-│
-├── processed/
-│   ├── air_quality_processed/   # Air quality data after preprocessing (Parquet)
-│   ├── traffic_data_processed/  # Traffic data after preprocessing (Parquet)
-│   └── districts/               # District boundaries (GeoJSON, unchanged)
+├── bronze/   # raw files, as downloaded from Madrid's open data API
+├── silver/   # cleaned versions of the same data
+└── gold/     # final tables + trained ML models, ready for the dashboard
 ```
 
-### 1. Download the data from the official sources:
+All files are `.parquet` (a compact table format), except the ML models
+(`.joblib`) and their metrics (`.json`).
 
-- Air Quality Records: https://datos.madrid.es/portal/site/egob/menuitem.c05c1f754a33a9fbe4b2e4b284f1a5a0/?vgnextoid=aecb88a7e2b73410VgnVCM2000000c205a0aRCRD
-- Traffic Historical Data: https://datos.madrid.es/portal/site/egob/menuitem.c05c1f754a33a9fbe4b2e4b284f1a5a0/?vgnextoid=33cb30c367e78410VgnVCM1000000b205a0aRCRD
-- Air Quality Station Metadata: https://datos.madrid.es/portal/site/egob/menuitem.c05c1f754a33a9fbe4b2e4b284f1a5a0/?vgnextoid=9e42c176313eb410VgnVCM1000000b205a0aRCRD
-- Traffic Sensor Metadata: https://datos.madrid.es/portal/site/egob/menuitem.c05c1f754a33a9fbe4b2e4b284f1a5a0/?vgnextoid=ee941ce6ba6d3410VgnVCM1000000b205a0aRCRD
-- District Boundaries GeoJSON: https://geoportal.madrid.es/IDEAM_WBGEOPORTAL/dataset.iam?id=541f4ef6-762b-11e9-861d-ecb1d753f6e8
+## Regenerating the data
 
-### 2. Convert CSV files to Parquet:
+1. `python -m src.data.ingest_api_bronze` — ingests everything (year range
+   from `INGEST_YEAR_START`/`INGEST_YEAR_END` in `.env`). For a single
+   dataset/year instead: `python -m src.data.ingest_api_bronze --dataset
+   <name> --years <year>`.
+2. `python -m src.data.preprocessing_bronze_gold`
+3. `python -m src.ml.main`
 
-After downloading each dataset in CSV format, convert it to Parquet for better storage and processing efficiency using the scripts in `src/Preprocessing`.
+## Reading the data
 
-### 3. Add Parquet files to the corresponding folder:
-
-Place each converted Parquet file in the appropriate folder under `data/processed/`. The district GeoJSON file does not need to be converted to Parquet and remains under `data/processed/districts/`.
-
-### 4. (Optional) Keep raw data:
-
-You can also store the original CSV/GeoJSON files in `data/raw/` to have a backup of the original data.
-
-### 5. Configure paths:
-
-Update any paths in your code or `.env` if necessary to point to the `processed/` folders for your analysis.
+Queries use [DuckDB](https://duckdb.org) to read the `.parquet` files
+directly — no database server needed. Default paths are `data/bronze|silver|gold/...`,
+overridable via environment variables (see `src/dashboard/.env.template`).

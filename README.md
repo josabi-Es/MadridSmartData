@@ -1,134 +1,109 @@
-# Smart City Traffic & Pollution Analysis
+# Madrid Smart Data
 
-## I. Introduction  
-This project focuses on analyzing traffic and pollution data from Madrid.  
-It provides a **Gradio interface with four interactive tabs**, where different insights about traffic and air quality can be explored.  
-The objective is to show a scalable workflow: **data ingestion, preprocessing, and visualization**.  
-This repository serves as a foundation for data-driven decision-making in smart cities.  
+Traffic & air quality analytics for Madrid open data: ingest → clean →
+forecast → dashboard, orchestrated by Airflow.
 
+<div align="center">
+<img src="https://skillicons.dev/icons?i=python,docker,git,githubactions&theme=light" />
+<br/><br/>
+<img src="https://img.shields.io/badge/Apache_Airflow-017CEE?style=for-the-badge&logo=apacheairflow&logoColor=white" />
+<img src="https://img.shields.io/badge/DuckDB-FFF000?style=for-the-badge&logo=duckdb&logoColor=black" />
+<img src="https://img.shields.io/badge/Parquet-50ABF1?style=for-the-badge" />
+<img src="https://img.shields.io/badge/Gradio-FF7C00?style=for-the-badge" />
+<img src="https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikitlearn&logoColor=white" />
+</div>
 
-## II. Repository Structure  
+## Workflow
 
-```text
-├── data
-└── src
-    ├── ingest
-    ├── interface
-    ├── Preprocessing
-    └── visualization
+![orchestration](docs/workflow.png)
 
+## Where the data comes from
+
+[Madrid Open Data](https://datos.madrid.es) is the city council's public
+data portal, free datasets (traffic, air quality, districts...) anyone
+can query, no login needed. It's served through **CKAN**, a standard
+open-data API: one call (`package_show?id=<dataset>`) returns the
+resource list for a dataset, then each resource is just a downloadable
+CSV/file. `src/data/bronze/ckan.py` does exactly that call, one dataset
+id per source (air, stations, traffic...).
+
+That raw pull lands in **DuckDB + Parquet**, no database server, just
+files queried directly with SQL, following the **Medallion**
+architecture: `bronze/` (raw, as CKAN gave it), `silver/` (cleaned),
+`gold/` (final tables + trained models), each stage only reading the one
+before it.
+
+## Run it
+
+```bash
+cp .env.template .env
+docker compose up --build
 ```
 
-#### 1. data/
+Two services, two ports:
 
-Contains input datasets, mainly in CSV or Parquet format. This is where all the raw and processed data is stored for analysis.
+| Port | Service | What it's for |
+|---|---|---|
+| **7860** | `dashboard` (Gradio) | See the result: the visualizer, already reading whatever data is in `data/` |
+| **8081** | `airflow` (`admin`/`admin`, from `.env`) | Trigger ingestion and retraining |
 
-**⚠️ Warning:** To replicate the program, please follow the instructions in the `data/README.txt` file.
+Trigger sequence in the Airflow UI (`Trigger DAG w/ config`):
 
-#### 2. src/ingest/
+1. **`daily_ingest`** first: pulls a year/month from the CKAN API into
+   `bronze/`, then runs `src/data/preprocessing_bronze_gold.py` (silver → gold dims/facts).
+2. **`retrain_forecast`** after, only once there's data: forecasts the next
+   `predict_months` into `gold/ml/`.
 
-Scripts for reading CSV files, converting them to Parquet, and uploading data to HDFS. These scripts are executed manually and help organize the raw data into a format suitable for big data processing.
+## Monitoring
 
-#### 3. src/interface/
+Expected DAG status on success (all tasks green):
 
-Contains the Gradio application. It has four tabs where users can explore different insights about traffic and pollution data interactively.
+<img src="docs/airflow_completed.png" width="900" />
 
-#### 4. src/Preprocessing/
+If a task fails in `bronze`, it cascades to `silver` and `gold`:
 
-Scripts to clean, transform, and prepare datasets after initial exploration. These ensure the data is ready for analysis and visualization.
+<img src="docs/airflow_error.png" width="900" />
 
-#### 5. src/visualization/
+## Dashboard cli
 
-Jupyter notebooks for rapid visualization and exploratory analysis. They help to understand patterns in traffic and pollution data before building final reports or dashboards.
-
-## III. Workflow Overview
-
-```mermaid
-graph LR
-    %% Nodos con nombres técnicos del proyecto
-    A[Portal Madrid] --> B{ingest}
-    B --> C[(Raw Data)]
-    C --> D{ETL Process}
-    D --> E[(Processed Data)]
-    E --> F[Gradio App]
-
-    %% Estilos técnicos (Colores por estado de dato)
-    style A fill:#cfd8dc,stroke:#546e7a
-    style B fill:#fff9c4,stroke:#fbc02d
-    style C fill:#ffe0b2,stroke:#fb8c00
-    style D fill:#c8e6c9,stroke:#388e3c
-    style E fill:#bbdefb,stroke:#1e88e5
-    style F fill:#f8bbd0,stroke:#c2185b
-```
-
-
-## IV. Technologies Used
-
-- Python 3.9+
-
-- Gradio → Interactive UI
-
-- Apache Spark & Hadoop (HDFS) → Data ingestion and storage
-
-- Pandas / PySpark → Data processing
-
-- Jupyter Notebooks → Visualization and prototyping
-
-# V. Usage > **Pending review:** Detailed usage instructions will be provided soon.
-
-1. Clone the repository
-```
-git clone <repo_url>
-cd <repo_name>
-```
-2. Install dependencies with uv (necesary)
-```
-pip install uv
+```bash
+cp .env.template .env
+uv venv
 uv sync
-```
-3. Activate the environment
-```
-source .venv/bin/activate or .venv/Script/activate
-```
-4. Configure environment variables
-
-Before running the application, you need to set up the environment variables in the correct order:
-
-- Read the `data/ README` : This will give you guidance on downloading and organizing the Open Data Madrid datasets.
-
-- Prepare raw data: You can use the `src/ingestion` scripts to convert the datasets to Parquet format or add them to HDFS as needed.
-
-- Preprocessing: The raw datasets are intended to be used with Spark and Hadoop. Follow the instructions in `src/preprocessing.py` to process the raw data and generate the cleaned datasets.
-
-- Set environment variables in interface.py: Open `src/interface` and follow its instructions pf `README.md` to properly configure the `.env file.` Ensure that all paths point to the processed datasets generated in the preprocessing step.
-
-Once these steps are complete, proceed to the next step in the workflow.
-
-5. Run the application locally
-```
-python src/interface/interface.py
+uv run python -m src.dashboard.interface
 ```
 
-This will launch a local Gradio interface with four tabs, each displaying different traffic and pollution insights.
+## CI/CD
 
-# VI. Gradio Results
+Every merge to `main` triggers:
 
-Below are some example insights you can obtain from the Gradio interface:
+1. **CI** (automated tests): `ruff check` + `pytest` via GitHub Actions
+2. **CD** (automated release): if all tests pass, a new release is created
+   automatically with a sequential version number (`release-v1`,
+   `release-v2`, `release-v3`, ...). A production server would always read
+   the highest release number to know which version is current.
 
-- **Gas concentration by district:** Compare pollutant levels (e.g., NO2, PM10, O3) across districts for a given month and year.
-- **Traffic intensity and district status:** Visualize traffic intensity and occupancy, and explore how it relates to air quality in specific districts.
-- **Traffic & pollution relationships:** Identify correlations between traffic patterns and pollutant concentrations.
+If a merge contains a **breaking change** (a significant change that affects
+compatibility), the release version increments accordingly. Otherwise, a
+regular release is created with the same version scheme.
 
-<p align="center">
-  <img src="images/ImageReadme_1.png" alt="Daily evolution of NO2 and traffic intensity." width="600">
-</p>
+---
 
-<p align="center">
-  <img src="images/ImageReadme_2.png" alt="NO2 concentration by district in February 2022." width="600">
-</p>
+## What this project enables
 
-These visualizations help you quickly identify districts with high traffic and poor air quality, and track temporal changes in pollutant levels.
+- **Automate everything with Airflow**: daily ingestion and model retraining
+  run as DAGs — programmable on a real server, no manual execution needed.
+- **Interactive visualization of stations and traffic points**: map with all
+  24 air quality stations and thousands of traffic measurement points,
+  filterable by district.
+- **Spot high pollution levels at a glance**: the map colors each district
+  by its monthly average (green → red), so you see instantly which districts
+  and months exceed safe thresholds.
+- **Forecast the next months**: a trained model estimates how each variable
+  (NO2, O3...) will evolve in the future, per station.
 
+### Demo
 
-# License
-This project is licensed under the GNU General Public License v3.0 (GPLv3) - see the [LICENSE](LICENSE) file for details.
+<video src="docs/summary.mp4" controls width="700"></video>
+
+---

@@ -1,0 +1,32 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get next version
+        id: version
+        run: |
+          LATEST=$(gh release list --limit 1 --json tagName -q '.[0].tagName' || echo "release-v0")
+          if [ "$LATEST" = "release-v0" ]; then
+            NEXT="release-v1"
+          else
+            NUM=${LATEST#release-v}
+            NEXT="release-v$((NUM + 1))"
+          fi
+          echo "tag=$NEXT" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          body: "Release ${{ steps.version.outputs.tag }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

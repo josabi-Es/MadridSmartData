@@ -15,7 +15,7 @@ BRONZE_ESTACIONES_PATH = os.getenv(
 )
 DISTRITOS_PATH = os.getenv("DISTRITOS_PATH", "data/bronze/distritos/latest.parquet")
 SILVER_ESTACIONES_PATH = os.getenv(
-    "SILVER_ESTACIONES_PATH", "data/silver/estaciones_aire/latest.parquet"
+    "SILVER_ESTACIONES_PATH", "data/silver/estaciones_aire.parquet"
 )
 
 

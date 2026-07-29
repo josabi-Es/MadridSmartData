@@ -1,20 +1,23 @@
 """DuckDB read-only queries over processed Parquet, replacing the Spark reads."""
 
+import functools
 import duckdb
 
 
-def get_traffic_districts(points_path: str) -> list[int]:
+@functools.lru_cache(maxsize=1)
+def get_traffic_districts(points_path: str) -> tuple[int, ...]:
     """Sorted distinct district ids from the traffic sensor locations.
 
     A handful of points ship with no district assigned at all (source data
     gap) -- excluded, or callers get a phantom "None" district option.
+    Cached for the session.
     """
     query = f"""
         SELECT DISTINCT distrito FROM '{points_path}'
         WHERE distrito IS NOT NULL
         ORDER BY distrito
     """
-    return [r[0] for r in duckdb.sql(query).fetchall()]
+    return tuple(r[0] for r in duckdb.sql(query).fetchall())
 
 
 def get_stations(path: str) -> list[str]:
@@ -100,14 +103,15 @@ def district_monthly_average(
     return duckdb.sql(query).fetchall()
 
 
+@functools.lru_cache(maxsize=32)
 def get_air_variables_by_district(
     air_path: str, stations_path: str, distrito: str
-) -> list[str]:
+) -> tuple[str, ...]:
     """Gases with at least one valid reading in this district's stations.
 
     Some districts' station(s) don't measure every gas -- without this,
     picking e.g. PM2.5 in a district that only tracks NO2/O3 just shows an
-    empty chart with no explanation.
+    empty chart with no explanation. Cached for the session.
     """
     query = f"""
         SELECT DISTINCT a.magnitud
@@ -116,7 +120,7 @@ def get_air_variables_by_district(
         WHERE a.validez = 'V' AND s.COD_DIS = '{distrito}'
         ORDER BY a.magnitud
     """
-    return [r[0] for r in duckdb.sql(query).fetchall()]
+    return tuple(r[0] for r in duckdb.sql(query).fetchall())
 
 
 def daily_traffic_series(path: str, id_trafico: str, variable: str) -> list[tuple]:
@@ -233,12 +237,13 @@ def count_traffic_points_by_district(points_path: str, distrito: str) -> int:
     return duckdb.sql(query).fetchone()[0]
 
 
+@functools.lru_cache(maxsize=32)
 def get_air_districts_by_variable(
     air_path: str, stations_path: str, gas: str
 ) -> list[str]:
     """Districts with at least one valid reading of `gas` -- the reverse
     cascade of `get_air_variables_by_district`, for narrowing the distrito
-    dropdown once a gas is picked."""
+    dropdown once a gas is picked. Cached for the session."""
     query = f"""
         SELECT DISTINCT s.COD_DIS
         FROM '{air_path}' a
@@ -246,13 +251,15 @@ def get_air_districts_by_variable(
         WHERE a.magnitud = '{gas}' AND a.validez = 'V'
         ORDER BY s.COD_DIS
     """
-    return [r[0] for r in duckdb.sql(query).fetchall()]
+    return tuple(r[0] for r in duckdb.sql(query).fetchall())
 
 
+@functools.lru_cache(maxsize=32)
 def get_air_periods_by_district(
     air_path: str, stations_path: str, gas: str, distrito: str
-) -> list[tuple[int, int]]:
-    """Distinct (año, mes) with a valid `gas` reading in this district."""
+) -> tuple[tuple[int, int], ...]:
+    """Distinct (year, month) with a valid `gas` reading in this district.
+    Cached for the session."""
     query = f"""
         SELECT DISTINCT extract(year FROM a.fecha)::INT AS anio,
                extract(month FROM a.fecha)::INT AS mes
@@ -261,23 +268,40 @@ def get_air_periods_by_district(
         WHERE a.magnitud = '{gas}' AND a.validez = 'V' AND s.COD_DIS = '{distrito}'
         ORDER BY anio, mes
     """
-    return duckdb.sql(query).fetchall()
+    return tuple(duckdb.sql(query).fetchall())
 
 
+@functools.lru_cache(maxsize=32)
 def get_traffic_periods_by_district(
     traffic_path: str, points_path: str, variable: str, distrito: str
-) -> list[tuple[int, int]]:
-    """Distinct (año, mes) with a valid reading of a traffic variable in this
-    district. No hour filter (unlike `daily_average_traffic_by_district`) --
-    a period with data only outside noon must still count as available."""
+) -> tuple[tuple[int, int], ...]:
+    """(year, month) tuples for all months between min and max fecha with a
+    valid reading of a traffic variable in this district. Assumes complete
+    monthly blocks (no gaps of single months within coverage range).
+    No hour filter (unlike `daily_average_traffic_by_district`).
+    Cached for the session."""
     if variable not in TRAFFIC_VARIABLES:
         raise ValueError(f"unknown traffic variable: {variable!r}")
+    # Query only min/max instead of DISTINCT to avoid expensive GROUP BY on 52M rows
     query = f"""
-        SELECT DISTINCT extract(year FROM t.fecha)::INT AS anio,
-               extract(month FROM t.fecha)::INT AS mes
+        SELECT min(t.fecha)::DATE AS fecha_min, max(t.fecha)::DATE AS fecha_max
         FROM '{traffic_path}' t
         JOIN '{points_path}' p ON t.id = p.id
         WHERE t.error = 'N' AND CAST(p.distrito AS VARCHAR) = '{distrito}'
-        ORDER BY anio, mes
     """
-    return duckdb.sql(query).fetchall()
+    result = duckdb.sql(query).fetchall()
+    if not result or result[0][0] is None:
+        return ()
+
+    fecha_min, fecha_max = result[0]
+    # Generate all consecutive (year, month) tuples between min/max
+    periodos = []
+    current = fecha_min.replace(day=1)
+    while current <= fecha_max:
+        periodos.append((current.year, current.month))
+        # Move to next month (handles year boundary)
+        if current.month == 12:
+            current = current.replace(year=current.year + 1, month=1)
+        else:
+            current = current.replace(month=current.month + 1)
+    return tuple(periodos)

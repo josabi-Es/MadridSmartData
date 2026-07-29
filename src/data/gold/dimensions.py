@@ -1,10 +1,4 @@
-"""Bronze/silver -> gold dimension tables: catalogs, no time series.
-
-Pull-forward of a slice of fase 2 (dim_distrito, dim_estacion_aire,
-dim_punto_trafico only -- no dim_magnitud, no fact_* yet) so the Resumen
-tab can read from gold today instead of waiting for the full dimensional
-model.
-"""
+"""Bronze/silver -> gold dimension tables: catalogs, no time series."""
 
 import os
 from pathlib import Path
@@ -37,9 +31,16 @@ def build_dim_estacion_aire(
 
 
 def build_dim_punto_trafico(points_path: str, out_path: str) -> None:
-    """Traffic points as-is -- already carry `distrito`, no join needed."""
+    """Traffic points deduplicated by id -- the glob has ~1.9x duplication
+    from snapshots; keep the latest one per sensor (highest snapshot date)."""
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    duckdb.sql(f"COPY (SELECT * FROM '{points_path}') TO '{out_path}' (FORMAT PARQUET)")
+    duckdb.sql(f"""
+        COPY (
+            SELECT DISTINCT ON (id) *
+            FROM '{points_path}'
+            ORDER BY id, 1 DESC
+        ) TO '{out_path}' (FORMAT PARQUET)
+    """)
 
 
 def build_dim_magnitud(out_path: str) -> None:
@@ -62,10 +63,7 @@ def build_dim_distrito(
     distritos_path: str, dim_estacion_path: str, dim_punto_path: str, out_path: str
 ) -> None:
     """Districts + coverage columns (n_estaciones_aire, n_puntos_trafico,
-    cobertura_aire) so a district with lots of traffic but zero air
-    stations can be flagged later without a background process -- it's
-    just a count computed once here.
-    """
+    cobertura_aire) -- flags districts with traffic but no air station."""
     distritos = gpd.read_parquet(distritos_path)
     distritos["COD_DIS"] = distritos["COD_DIS"].astype(str)
 

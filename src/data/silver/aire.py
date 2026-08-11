@@ -25,6 +25,9 @@ def unpivot_air_quality(bronze_path: str, out_path: str) -> None:
     Days that don't exist for a given month (D31 in April, etc.) are NOT
     NULL in the source -- they're padded with dato=0.0, validez='N'. The
     only reliable filter is the real calendar: day <= last day of ANO/MES.
+
+    Output columns are UPPERCASE and homogenized project-wide: ESTACION ->
+    ID_AIRE (same short code dim_estacion_aire keys on).
     """
     magnitud_case = "CASE MAGNITUD " + " ".join(
         f"WHEN {code} THEN '{label}'" for code, label in MAGNITUD_LABELS.items()
@@ -32,9 +35,9 @@ def unpivot_air_quality(bronze_path: str, out_path: str) -> None:
 
     days = [
         f"""
-        SELECT ESTACION AS estacion, {magnitud_case} AS magnitud,
-               MAKE_DATE(CAST(ANO AS INTEGER), CAST(MES AS INTEGER), {d}) AS fecha,
-               D{d:02d} AS dato, V{d:02d} AS validez
+        SELECT ESTACION AS ID_AIRE, {magnitud_case} AS MAGNITUD,
+               MAKE_DATE(CAST(ANO AS INTEGER), CAST(MES AS INTEGER), {d}) AS FECHA,
+               D{d:02d} AS DATO, V{d:02d} AS VALIDEZ
         FROM '{bronze_path}'
         WHERE {d} <= EXTRACT(DAY FROM LAST_DAY(
             MAKE_DATE(CAST(ANO AS INTEGER), CAST(MES AS INTEGER), 1)
@@ -42,7 +45,7 @@ def unpivot_air_quality(bronze_path: str, out_path: str) -> None:
         """
         for d in range(1, 32)
     ]
-    query = f"SELECT DISTINCT * FROM ({' UNION ALL '.join(days)}) WHERE validez = 'V'"
+    query = f"SELECT DISTINCT * FROM ({' UNION ALL '.join(days)}) WHERE VALIDEZ = 'V'"
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     duckdb.sql(f"COPY ({query}) TO '{out_path}' (FORMAT PARQUET)")
 

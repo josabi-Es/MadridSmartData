@@ -13,6 +13,20 @@ SILVER_TRAFFIC_PATH = os.getenv("SILVER_TRAFFIC_PATH", "data/silver/trafico.parq
 
 TRAFFIC_METRICS = ["intensidad", "ocupacion", "carga", "vmed"]
 
+# Bronze/source column -> silver column. Uppercase + homogenized keys
+# project-wide (id -> ID_TRAFICO, matches dim_punto_trafico.ID_TRAFICO).
+COLUMN_RENAME = {
+    "id": "ID_TRAFICO",
+    "fecha": "FECHA",
+    "tipo_elem": "TIPO_ELEM",
+    "intensidad": "INTENSIDAD",
+    "ocupacion": "OCUPACION",
+    "carga": "CARGA",
+    "vmed": "VMED",
+    "error": "ERROR",
+    "periodo_integracion": "PERIODO_INTEGRACION",
+}
+
 
 # Conservative sanity cap for intensidad (veh/h). Not from an official
 # source (unlike carga's documented 0-100) -- picked from the real data
@@ -33,6 +47,12 @@ def clean_traffic(bronze_path: str, out_path: str) -> None:
     Rows left with any invalid metric are dropped rather than imputed --
     imputing by (mes, dia) group would mix years, leaking future data into
     the past for time-series use.
+
+    Rows with `error != 'N'` are dropped too (general project rule: only
+    valid, error-free readings survive silver) -- downstream no longer
+    needs to filter on ERROR itself, which is why gold's FACT_TRAFICO drops
+    that column entirely. Output columns are renamed uppercase via
+    `COLUMN_RENAME` (id -> ID_TRAFICO, homogenized project-wide).
     """
     def clip(c: str) -> str:
         if c not in TRAFFIC_METRICS:
@@ -43,10 +63,15 @@ def clean_traffic(bronze_path: str, out_path: str) -> None:
     all_columns = duckdb.sql(f"SELECT * FROM '{bronze_path}' LIMIT 0").columns
     columns = [clip(c) for c in all_columns]
     metrics_not_null = " AND ".join(f"{c} IS NOT NULL" for c in TRAFFIC_METRICS)
-    query = (
+    cleaned = (
         f"SELECT DISTINCT * FROM (SELECT {', '.join(columns)} FROM '{bronze_path}') "
-        f"WHERE {metrics_not_null}"
+        f"WHERE {metrics_not_null} AND error = 'N'"
     )
+    renamed_cols = ", ".join(
+        f"{old} AS {COLUMN_RENAME.get(old, old.upper())}" for old in all_columns
+    )
+    query = f"SELECT {renamed_cols} FROM ({cleaned})"
+
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     # Traffic is 15-min resolution across ~4,700 sensors -- a month can be
     # 10M+ rows. duckdb defaults to one thread per core, which spikes RAM

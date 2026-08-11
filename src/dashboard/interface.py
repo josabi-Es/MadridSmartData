@@ -119,7 +119,7 @@ with gr.Blocks() as demo:
                     )
                     selector_var_trafico_corr = gr.Dropdown(
                         choices=sorted(TRAFFIC_VARIABLES),
-                        value="intensidad",
+                        value="INTENSIDAD",
                         label="Traffic variable",
                     )
                 boton_corr = gr.Button("Show correlation")

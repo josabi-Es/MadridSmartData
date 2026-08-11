@@ -22,7 +22,7 @@ MESES_FALLBACK = list(range(1, 13))
 
 UNITS = {
     "NO2": "µg/m³", "PM10": "µg/m³", "PM2.5": "µg/m³", "O3": "µg/m³", "NOx": "µg/m³",
-    "intensidad": "veh/h", "ocupacion": "%", "carga": "%", "vmed": "km/h",
+    "INTENSIDAD": "veh/h", "OCUPACION": "%", "CARGA": "%", "VMED": "km/h",
 }  # fmt: skip
 
 
@@ -36,11 +36,9 @@ def obtener_distritos(dominio=None, variable=None):
         disponibles = get_air_districts_by_variable(
             AIRQUALITY_PATH, ESTACIONES_DISTRITO_PATH, variable
         )
-        # COD_DIS is VARCHAR without leading zero ("1", not "01") -- normalized
-        # to int so dropdown doesn't mix types with traffic list (already int).
-        return sorted(int(d) for d in disponibles) or get_traffic_districts(
-            TRAFFIC_POINTS_PATH
-        )
+        # COD_DIS is zero-padded ("01", not "1") everywhere now -- both lists
+        # already share that representation, no normalization needed.
+        return sorted(disponibles) or get_traffic_districts(TRAFFIC_POINTS_PATH)
     return get_traffic_districts(TRAFFIC_POINTS_PATH)
 
 

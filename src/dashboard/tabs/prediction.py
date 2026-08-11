@@ -14,6 +14,7 @@ import pandas as pd
 
 ML_DIR = Path("data/gold/ml")
 FACT_AIR_PATH = "data/gold/fact_calidad_aire.parquet"
+DIM_MAGNITUD_PATH = "data/gold/dim_magnitud.parquet"
 
 # ponytail: show the longest horizon on disk. A 1-month and a 2-month run
 # coexist as separate files; add a horizon selector only if you want both at once.
@@ -39,18 +40,20 @@ def gases_disponibles() -> list[str]:
 
 def obtener_estaciones_prediccion(gas: str) -> list[int]:
     meses, ruta = _runs()[gas]
-    return sorted(pd.read_parquet(ruta)["estacion"].unique().tolist())
+    return sorted(pd.read_parquet(ruta)["ID_AIRE"].unique().tolist())
 
 
 def graficar_prediccion(gas: str, estacion_id):
     meses, ruta = _runs()[gas]
     pred = pd.read_parquet(ruta)
-    pred = pred[pred["estacion"] == int(estacion_id)].sort_values("fecha")
+    pred = pred[pred["ID_AIRE"] == int(estacion_id)].sort_values("FECHA")
 
     real = duckdb.sql(
         f"""
-        SELECT fecha, dato FROM '{FACT_AIR_PATH}'
-        WHERE magnitud = ? AND estacion = ? ORDER BY fecha
+        SELECT a.FECHA AS fecha, a.DATO AS dato
+        FROM '{FACT_AIR_PATH}' a
+        JOIN '{DIM_MAGNITUD_PATH}' m ON a.ID_MAGNITUD = m.ID_MAGNITUD
+        WHERE m.MAGNITUD = ? AND a.ID_AIRE = ? ORDER BY fecha
         """,
         params=[gas, int(estacion_id)],
     ).df()
@@ -63,11 +66,11 @@ def graficar_prediccion(gas: str, estacion_id):
         ultima_dato_real = real[pd.to_datetime(real["fecha"]) == ultima_fecha_real]["dato"].iloc[0]
         pred_continuo_x = pd.concat([
             pd.Series([ultima_fecha_real]),
-            pd.to_datetime(pred["fecha"])
+            pd.to_datetime(pred["FECHA"])
         ]).reset_index(drop=True)
         pred_continuo_y = pd.concat([
             pd.Series([ultima_dato_real]),
-            pd.Series(pred["valor_predicho"].values)
+            pd.Series(pred["VALOR_PREDICHO"].values)
         ]).reset_index(drop=True)
         ax.plot(
             pred_continuo_x,
@@ -79,8 +82,8 @@ def graficar_prediccion(gas: str, estacion_id):
         ax.axvline(ultima_fecha_real, color="grey", linestyle=":")
     else:
         ax.plot(
-            pd.to_datetime(pred["fecha"]),
-            pred["valor_predicho"],
+            pd.to_datetime(pred["FECHA"]),
+            pred["VALOR_PREDICHO"],
             color="r",
             linestyle="--",
             label=f"Predicho ({meses} mes/es)",

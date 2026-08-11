@@ -13,9 +13,9 @@ def kpis_resumen_texto():
     """4 cards: # districts, air stations, traffic points, districts without coverage."""
     df = _cargar_dim_distrito()
     n_distritos = len(df)
-    n_estaciones = int(df["n_estaciones_aire"].sum())
-    n_puntos = int(df["n_puntos_trafico"].sum())
-    n_sin_cobertura = int((~df["cobertura_aire"]).sum())
+    n_estaciones = int(df["N_ESTACIONES_AIRE"].sum())
+    n_puntos = int(df["N_PUNTOS_TRAFICO"].sum())
+    n_sin_cobertura = int((~df["COBERTURA_AIRE"]).sum())
     return (
         f"**Districts**  \n{n_distritos}",
         f"**Air stations**  \n{n_estaciones}",
@@ -31,7 +31,7 @@ def tabla_cobertura_html():
 
     filas = ""
     for _, row in df.iterrows():
-        if row["cobertura_aire"]:
+        if row["COBERTURA_AIRE"]:
             badge = (
                 "<span style='background:#d4f4dd;color:#1a7a3a;"
                 "padding:2px 8px;border-radius:4px;'>With coverage</span>"
@@ -44,8 +44,8 @@ def tabla_cobertura_html():
         filas += (
             "<tr style='border-top:1px solid #ddd;'>"
             f"<td style='padding:6px 8px;'>{row['NOMBRE']}</td>"
-            f"<td style='padding:6px 8px;'>{row['n_estaciones_aire']}</td>"
-            f"<td style='padding:6px 8px;'>{row['n_puntos_trafico']}</td>"
+            f"<td style='padding:6px 8px;'>{row['N_ESTACIONES_AIRE']}</td>"
+            f"<td style='padding:6px 8px;'>{row['N_PUNTOS_TRAFICO']}</td>"
             f"<td style='padding:6px 8px;'>{badge}</td>"
             "</tr>"
         )

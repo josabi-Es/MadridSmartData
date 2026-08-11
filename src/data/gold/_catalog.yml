@@ -2,79 +2,135 @@
 # columnas, script que la genera, cadencia de refresco esperada. Sirve para
 # detectar schema drift comparando contra el DESCRIBE real de DuckDB (test
 # pendiente, no implementado esta fase).
+#
+# Todas las columnas en MAYUSCULAS, claves homogeneizadas (ID_AIRE,
+# ID_TRAFICO, COD_DIS) para que Power BI infiera relaciones por nombre.
+# Sin fila sentinela "-1": dim_punto_trafico descarta en origen los puntos
+# sin distrito real (build_dim_punto_trafico, WHERE distrito IS NOT NULL),
+# así que COD_DIS siempre resuelve contra un distrito real de dim_distrito.
 
 dim_distrito:
-  grano: un distrito
+  grano: un distrito (21 filas, sin fila sentinela)
   clave_natural: COD_DIS
   columnas:
     COD_DIS: VARCHAR
     NOMBRE: VARCHAR
-    geometry: GEOMETRY
-    n_estaciones_aire: BIGINT
-    n_puntos_trafico: BIGINT
-    cobertura_aire: BOOLEAN
+    GEOMETRY: GEOMETRY
+    N_ESTACIONES_AIRE: BIGINT
+    N_PUNTOS_TRAFICO: BIGINT
+    COBERTURA_AIRE: BOOLEAN
+    COBERTURA_TRAFICO: BOOLEAN
   script: src/data/gold/dimensions.py::build_dim_distrito
   refresco_esperado: al reingestar distritos/estaciones/puntos (poco frecuente)
 
+dim_geometria:
+  grano: un distrito (21 filas), solo geometría -- separada de dim_distrito
+    a propósito para que Power BI tenga una única fuente de polígonos, sin
+    mezclar con atributos/medidas
+  clave_natural: COD_DIS
+  columnas:
+    COD_DIS: VARCHAR
+    GEOMETRY_WKT: VARCHAR (polígono en WGS84/EPSG:4326, texto WKT -- lo que
+      cualquier visual de mapa en Power BI puede leer; dim_distrito.GEOMETRY
+      se queda en su CRS nativo, WKB, opaco para el conector parquet de PBI)
+  script: src/data/gold/dimensions.py::build_dim_geometria
+  refresco_esperado: al reingestar distritos (poco frecuente)
+
 dim_estacion_aire:
   grano: una estación de calidad del aire
-  clave_natural: CODIGO_CORTO
+  clave_natural: ID_AIRE
   columnas:
-    CODIGO_CORTO: BIGINT
+    ID_AIRE: BIGINT
     ESTACION: VARCHAR
-    LONGITUD: DOUBLE
+    DIRECCION: VARCHAR
     LATITUD: DOUBLE
+    LONGITUD: DOUBLE
     COD_DIS: VARCHAR
-    NOMBRE: VARCHAR
+    NO2: BIGINT
+    SO2: BIGINT
+    CO: BIGINT
+    PM10: BIGINT
+    PM2_5: BIGINT
+    O3: BIGINT
+    BTX: BIGINT
   script: src/data/gold/dimensions.py::build_dim_estacion_aire
   refresco_esperado: al reingestar estaciones_aire (poco frecuente)
+  nota: NO2..BTX son flags binarios (1 si la estación mide ese gas, 0 si no) --
+    ya no "X"/None como en bronze/silver.
 
 dim_punto_trafico:
   grano: un punto de medida de tráfico
-  clave_natural: id
+  clave_natural: ID_TRAFICO
   columnas:
-    id: BIGINT
-    distrito: BIGINT
-    tipo_elem: VARCHAR
-    nombre: VARCHAR
-    longitud: DOUBLE
-    latitud: DOUBLE
+    ID_TRAFICO: BIGINT
+    COD_DIS: VARCHAR
+    NOMBRE: VARCHAR
+    LATITUD: DOUBLE
+    LONGITUD: DOUBLE
   script: src/data/gold/dimensions.py::build_dim_punto_trafico
   refresco_esperado: al reingestar trafico_puntos_medida (poco frecuente)
 
 dim_magnitud:
   grano: un tipo de gas medido
-  clave_natural: codigo
+  clave_natural: ID_MAGNITUD
   columnas:
-    codigo: INTEGER
-    magnitud: VARCHAR
+    ID_MAGNITUD: INTEGER
+    MAGNITUD: VARCHAR
   script: src/data/gold/dimensions.py::build_dim_magnitud
   refresco_esperado: estático, no cambia salvo nueva magnitud oficial
 
-fact_calidad_aire:
-  grano: estación x fecha x magnitud
-  clave_natural: [estacion, fecha, magnitud]
+dim_medida_trafico:
+  grano: una métrica de tráfico
+  clave_natural: ID_MEDIDA_TRAFICO
   columnas:
-    estacion: BIGINT
-    cod_dis: VARCHAR
-    magnitud: VARCHAR
-    fecha: DATE
-    dato: DOUBLE
-    validez: VARCHAR
+    ID_MEDIDA_TRAFICO: INTEGER
+    MEDIDA: VARCHAR
+  script: src/data/gold/dimensions.py::build_dim_medida_trafico
+  refresco_esperado: estático, no cambia
+  nota: catálogo de INTENSIDAD/OCUPACION/CARGA/VMED -- existe solo para que
+    FACT_TRAFICO_DIARIO pueda despivotar esas 4 columnas en filas, igual
+    que dim_magnitud hace con los gases en fact_calidad_aire.
+
+dim_fecha:
+  grano: un día de calendario, cubre el rango de FACT_CALIDAD_AIRE y FACT_TRAFICO
+  clave_natural: FECHA
+  columnas:
+    FECHA: TIMESTAMP (medianoche, usar como DATE)
+    ANIO: BIGINT
+    MES: BIGINT
+  script: src/data/gold/dimensions.py::build_dim_fecha
+  refresco_esperado: al reingestar aire o tráfico (crece el rango de fechas)
+  nota: el grano de origen (silver/trafico, 15 min) se agrega a día antes de
+    llegar a gold en FACT_TRAFICO_DIARIO -- ese fact no persiste la
+    resolución de 15 min, se descarta en la propia consulta de agregación.
+
+fact_calidad_aire:
+  grano: ID_AIRE x FECHA x ID_MAGNITUD
+  clave_natural: [ID_AIRE, FECHA, ID_MAGNITUD]
+  columnas:
+    FECHA: DATE
+    ID_AIRE: BIGINT
+    COD_DIS: VARCHAR
+    ID_MAGNITUD: INTEGER
+    DATO: DOUBLE
   script: src/data/gold/facts.py::build_fact_calidad_aire
   refresco_esperado: diario, tras cada re-ejecución de silver/aire
+  nota: sin VALIDEZ (silver ya solo deja validez='V'); MAGNITUD (texto) ya
+    no viaja en el fact, solo el FK ID_MAGNITUD -> dim_magnitud.
 
-fact_trafico:
-  grano: punto x fecha
-  clave_natural: [id, fecha]
+fact_trafico_diario:
+  grano: ID_TRAFICO x FECHA(día) x ID_MEDIDA_TRAFICO
+  clave_natural: [ID_TRAFICO, FECHA, ID_MEDIDA_TRAFICO]
   columnas:
-    id: BIGINT
-    distrito: BIGINT
-    fecha: TIMESTAMP
-    intensidad: DOUBLE
-    ocupacion: DOUBLE
-    carga: DOUBLE
-    vmed: DOUBLE
-    error: VARCHAR
-  script: src/data/gold/facts.py::build_fact_trafico
+    FECHA: DATE
+    ID_TRAFICO: BIGINT
+    COD_DIS: VARCHAR
+    ID_MEDIDA_TRAFICO: INTEGER
+    VALOR: DOUBLE
+  script: src/data/gold/facts.py::build_fact_trafico_diario
   refresco_esperado: diario, tras cada re-ejecución de silver/trafico
+  nota: agregado diario (media) despivotado, calculado directamente desde
+    silver/trafico (15 min, 89M+ filas -- nunca materializado a ese grano en
+    gold, demasiado pesado para Power BI). VALOR resuelve por MEDIDA ->
+    dim_medida_trafico (mismo patrón que DATO/ID_MAGNITUD en
+    fact_calidad_aire).

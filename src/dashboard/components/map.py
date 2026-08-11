@@ -42,11 +42,11 @@ GAS_TRAMOS = {
 # no official color scale for traffic exists anywhere. Bands below are heuristic
 # (were before this revision), unchanged values.
 TRAFFIC_TRAMOS = {
-    "carga": [(0, 25, "green"), (25, 50, "yellow"), (50, 75, "orange"), (75, float("inf"), "red")],
-    "ocupacion": [(0, 20, "green"), (20, 40, "yellow"), (40, 60, "orange"), (60, float("inf"), "red")],
-    "intensidad": [(0, 500, "green"), (500, 1000, "yellow"), (1000, 2000, "orange"), (2000, float("inf"), "red")],
-    # vmed reversed: low speed = congestion
-    "vmed": [(0, 20, "red"), (20, 40, "orange"), (40, 60, "yellow"), (60, float("inf"), "green")],
+    "CARGA": [(0, 25, "green"), (25, 50, "yellow"), (50, 75, "orange"), (75, float("inf"), "red")],
+    "OCUPACION": [(0, 20, "green"), (20, 40, "yellow"), (40, 60, "orange"), (60, float("inf"), "red")],
+    "INTENSIDAD": [(0, 500, "green"), (500, 1000, "yellow"), (1000, 2000, "orange"), (2000, float("inf"), "red")],
+    # VMED reversed: low speed = congestion
+    "VMED": [(0, 20, "red"), (20, 40, "orange"), (40, 60, "yellow"), (60, float("inf"), "green")],
 }  # fmt: skip
 
 VARIABLE_TRAMOS = {**GAS_TRAMOS, **TRAFFIC_TRAMOS}
@@ -115,7 +115,7 @@ def generar_mapa_posiciones_html(distrito=None):
         geojson.add_child(folium.Popup(f"<b>{row['NOMBRE']}</b>"))
         geojson.add_to(m)
 
-    for codigo, estacion, longitud, latitud, cod_dis in estaciones_aire_coords(
+    for id_aire, estacion, longitud, latitud, cod_dis in estaciones_aire_coords(
         ESTACIONES_DISTRITO_PATH
     ):
         folium.CircleMarker(
@@ -124,7 +124,7 @@ def generar_mapa_posiciones_html(distrito=None):
             color="blue",
             fill=True,
             fill_color="blue",
-            popup=f"Air station {codigo}: {estacion} (district {cod_dis})",
+            popup=f"Air station {id_aire}: {estacion} (district {cod_dis})",
         ).add_to(m)
 
     if distrito:
@@ -189,7 +189,7 @@ def generar_mapa_colores_html(dominio, variable, anio, mes):
 
 
 def generar_mapa_cobertura_html():
-    """Choropleth for Summary tab: green/red by `cobertura_aire` from
+    """Choropleth for Summary tab: green/red by `COBERTURA_AIRE` from
     `gold/dim_distrito.parquet` -- catalog only, no measurement data.
     """
     distritos = gpd.read_parquet(GOLD_DIM_DISTRITO_PATH).to_crs("EPSG:4326")
@@ -197,9 +197,9 @@ def generar_mapa_cobertura_html():
     m = folium.Map(location=[40.4168, -3.7038], zoom_start=11)
 
     for _, row in distritos.iterrows():
-        color = "green" if row["cobertura_aire"] else "red"
+        color = "green" if row["COBERTURA_AIRE"] else "red"
         geojson = folium.GeoJson(
-            data=row["geometry"].__geo_interface__,
+            data=row["GEOMETRY"].__geo_interface__,
             style_function=lambda feature, col=color: {
                 "fillColor": col,
                 "color": "black",
@@ -209,8 +209,8 @@ def generar_mapa_cobertura_html():
         )
         popup = (
             f"<b>{row['NOMBRE']}</b><br>"
-            f"Air stations: {row['n_estaciones_aire']}<br>"
-            f"Traffic points: {row['n_puntos_trafico']}"
+            f"Air stations: {row['N_ESTACIONES_AIRE']}<br>"
+            f"Traffic points: {row['N_PUNTOS_TRAFICO']}"
         )
         geojson.add_child(folium.Popup(popup))
         geojson.add_to(m)

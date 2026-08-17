@@ -127,6 +127,45 @@ def build_dim_medida_trafico(out_path: str) -> None:
     """)
 
 
+# NO2/SO2/CO/PM10/PM2_5/O3 map 1:1 to an ID_MAGNITUD (see dim_magnitud).
+# BTX excluded on purpose: it's one station flag covering 6 different
+# ID_MAGNITUD (TOL/BEN/EBE/MXY/PXY/OXY), no single id to point it at.
+GAS_TO_ID_MAGNITUD = {"NO2": 8, "SO2": 1, "CO": 6, "PM10": 10, "PM2_5": 9, "O3": 14}
+GAS_TO_MAGNITUD_NOMBRE = {"PM2_5": "PM2.5"}  # el resto coincide tal cual
+
+
+def build_dim_distrito_magnitud(dim_estacion_path: str, out_path: str) -> None:
+    """COD_DIS + gas: one row per gas measured by >=1 station in that
+    district. Small lookup table, easy to drop straight into a Power BI
+    table visual without parsing anything.
+
+    Built from DIM_ESTACION_AIRE's gas flags (not FACT_CALIDAD_AIRE) to
+    avoid a build-order dependency on facts -- same reasoning as
+    build_dim_fecha reading silver instead of the facts.
+    """
+    gases = list(GAS_TO_ID_MAGNITUD)
+    agg = ", ".join(f"max({g}) AS {g}" for g in gases)
+    flags = duckdb.sql(f"""
+        SELECT COD_DIS, {agg}
+        FROM '{dim_estacion_path}'
+        GROUP BY COD_DIS
+    """).df()
+
+    rows = [
+        {
+            "COD_DIS": row.COD_DIS,
+            "ID_MAGNITUD": GAS_TO_ID_MAGNITUD[g],
+            "MAGNITUD": GAS_TO_MAGNITUD_NOMBRE.get(g, g),
+        }
+        for row in flags.itertuples()
+        for g in gases
+        if getattr(row, g) == 1
+    ]
+    out = pd.DataFrame(rows, columns=["COD_DIS", "ID_MAGNITUD", "MAGNITUD"])
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    out.to_parquet(out_path, index=False)
+
+
 def build_dim_distrito(
     distritos_path: str, dim_estacion_path: str, dim_punto_path: str, out_path: str
 ) -> None:
@@ -241,6 +280,7 @@ def main(target: str = "all") -> None:
     dim_estacion_path = f"{GOLD_DIR}/dim_estacion_aire.parquet"
     dim_punto_path = f"{GOLD_DIR}/dim_punto_trafico.parquet"
     dim_distrito_path = f"{GOLD_DIR}/dim_distrito.parquet"
+    dim_distrito_magnitud_path = f"{GOLD_DIR}/dim_distrito_magnitud.parquet"
     dim_geometria_path = f"{GOLD_DIR}/dim_geometria.parquet"
     dim_magnitud_path = f"{GOLD_DIR}/dim_magnitud.parquet"
     dim_medida_trafico_path = f"{GOLD_DIR}/dim_medida_trafico.parquet"
@@ -260,6 +300,10 @@ def main(target: str = "all") -> None:
         )
         logger.info("dim_distrito -> %s", dim_distrito_path)
 
+    if target in ("dim_distrito_magnitud", "all"):
+        build_dim_distrito_magnitud(dim_estacion_path, dim_distrito_magnitud_path)
+        logger.info("dim_distrito_magnitud -> %s", dim_distrito_magnitud_path)
+
     if target in ("dim_geometria", "all"):
         build_dim_geometria(DISTRITOS_PATH, dim_geometria_path)
         logger.info("dim_geometria -> %s", dim_geometria_path)
@@ -276,6 +320,17 @@ def main(target: str = "all") -> None:
         build_dim_fecha(SILVER_AIR_PATH, SILVER_TRAFFIC_PATH, dim_fecha_path)
         logger.info("dim_fecha -> %s", dim_fecha_path)
 
+    if target == "all":
+        _self_check_dim_distrito_magnitud(dim_distrito_magnitud_path, dim_magnitud_path)
+
+
+def _self_check_dim_distrito_magnitud(path: str, dim_magnitud_path: str) -> None:
+    valid = duckdb.sql(f"SELECT ID_MAGNITUD, MAGNITUD FROM '{dim_magnitud_path}'").df()
+    rows = duckdb.sql(f"SELECT COD_DIS, ID_MAGNITUD, MAGNITUD FROM '{path}'").df()
+    dup = rows.duplicated(subset=["COD_DIS", "ID_MAGNITUD"]).sum()
+    assert dup == 0, f"{dup} pares COD_DIS+ID_MAGNITUD duplicados"
+    assert set(rows["ID_MAGNITUD"]) <= set(valid["ID_MAGNITUD"]), "ID_MAGNITUD fuera de catalogo"
+
 
 if __name__ == "__main__":
     import argparse
@@ -285,6 +340,7 @@ if __name__ == "__main__":
         "--target",
         default="all",
         choices=["all", "dim_estacion_aire", "dim_punto_trafico", "dim_distrito",
-                 "dim_geometria", "dim_magnitud", "dim_medida_trafico", "dim_fecha"],
+                 "dim_distrito_magnitud", "dim_geometria", "dim_magnitud",
+                 "dim_medida_trafico", "dim_fecha"],
     )  # fmt: skip
     main(parser.parse_args().target)

@@ -15,7 +15,7 @@ forecast → dashboard, orchestrated by Airflow.
 
 ## Workflow
 
-![orchestration](docs/workflow.png)
+![orchestration](docs/assets/workflow.png)
 
 ## Where the data comes from
 
@@ -58,11 +58,11 @@ Trigger sequence in the Airflow UI (`Trigger DAG w/ config`):
 
 Expected DAG status on success (all tasks green):
 
-<img src="docs/airflow_completed.png" width="900" />
+<img src="docs/assets/airflow_completed.png" width="900" />
 
 If a task fails in `bronze`, it cascades to `silver` and `gold`:
 
-<img src="docs/airflow_error.png" width="900" />
+<img src="docs/assets/airflow_error.png" width="900" />
 
 ## Dashboard cli
 
@@ -104,6 +104,6 @@ regular release is created with the same version scheme.
 
 ### Demo
 
-<video src="https://github.com/user-attachments/assets/68094520-025f-4b83-a620-e5b63a3e56dc" controls width="700"></video>
+<video src="https://github.com/user-attachments/assets/7035ff6a-8832-433d-9783-efc64b22313b" controls width="700"></video>
 
 ---

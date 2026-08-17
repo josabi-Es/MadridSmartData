@@ -329,7 +329,8 @@ def _self_check_dim_distrito_magnitud(path: str, dim_magnitud_path: str) -> None
     rows = duckdb.sql(f"SELECT COD_DIS, ID_MAGNITUD, MAGNITUD FROM '{path}'").df()
     dup = rows.duplicated(subset=["COD_DIS", "ID_MAGNITUD"]).sum()
     assert dup == 0, f"{dup} pares COD_DIS+ID_MAGNITUD duplicados"
-    assert set(rows["ID_MAGNITUD"]) <= set(valid["ID_MAGNITUD"]), "ID_MAGNITUD fuera de catalogo"
+    bad_ids = set(rows["ID_MAGNITUD"]) - set(valid["ID_MAGNITUD"])
+    assert not bad_ids, f"ID_MAGNITUD fuera de catalogo: {bad_ids}"
 
 
 if __name__ == "__main__":

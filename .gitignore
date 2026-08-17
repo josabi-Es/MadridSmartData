@@ -71,3 +71,5 @@ ml.md
 
 # PowerBI   
 powerbi/
+# videos: served via GitHub attachments, not the repo
+docs/assets/*.mp4

@@ -92,7 +92,7 @@ regular release is created with the same version scheme.
 ## What this project enables
 
 - **Automate everything with Airflow**: daily ingestion and model retraining
-  run as DAGs — programmable on a real server, no manual execution needed.
+  run as DAGs, programmable on a real server, no manual execution needed.
 - **Interactive visualization of stations and traffic points**: map with all
   24 air quality stations and thousands of traffic measurement points,
   filterable by district.
@@ -101,6 +101,12 @@ regular release is created with the same version scheme.
   and months exceed safe thresholds.
 - **Forecast the next months**: a trained model estimates how each variable
   (NO2, O3...) will evolve in the future, per station.
+
+The gold layer uses a **Galaxy Schema**: air quality and traffic are two
+different business processes, but analyzing them together by district and
+date needs shared dimensions instead of duplicating them.
+
+<img src="docs/assets/galaxy_schema.png" alt="Galaxy schema of the gold layer" width="900">
 
 ### Demo
 

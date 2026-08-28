@@ -1,80 +1,125 @@
-# Catálogo vivo de data/gold/. Una entrada por tabla: grano, clave natural,
-# columnas, script que la genera, cadencia de refresco esperada. Sirve para
-# detectar schema drift comparando contra el DESCRIBE real de DuckDB (test
-# pendiente, no implementado esta fase).
+# Live catalogue of the `gold` schema in Unity Catalog (dev.gold / pro.gold).
+# One entry per table: grain, natural key, columns, the notebook that builds it.
+# Column names are lowercase snake_case: sanitize_column_names normalises them
+# already in bronze. Spark types.
 
-dim_distrito:
-  grano: un distrito
-  clave_natural: COD_DIS
-  columnas:
-    COD_DIS: VARCHAR
-    NOMBRE: VARCHAR
-    geometry: GEOMETRY
-    n_estaciones_aire: BIGINT
-    n_puntos_trafico: BIGINT
-    cobertura_aire: BOOLEAN
-  script: src/data/gold/dimensions.py::build_dim_distrito
-  refresco_esperado: al reingestar distritos/estaciones/puntos (poco frecuente)
+dim_fecha:
+  grain: one calendar day
+  natural_key: fecha
+  columns:
+    fecha: date
+    ano: int
+    mes: int
+    dia: int
+    dia_semana: int
+    nombre_mes: string
+    es_finde: boolean
+  notebook: src/data/gold/dimensions.ipynb (target=dim_fecha)
+  notes: >
+    Covers the year_start..year_end widget range. Exists so coverage analysis can
+    LEFT JOIN against it and report which days are missing, not just how many.
 
 dim_estacion_aire:
-  grano: una estación de calidad del aire
-  clave_natural: CODIGO_CORTO
-  columnas:
-    CODIGO_CORTO: BIGINT
-    ESTACION: VARCHAR
-    LONGITUD: DOUBLE
-    LATITUD: DOUBLE
-    COD_DIS: VARCHAR
-    NOMBRE: VARCHAR
-  script: src/data/gold/dimensions.py::build_dim_estacion_aire
-  refresco_esperado: al reingestar estaciones_aire (poco frecuente)
+  grain: one air quality station
+  natural_key: codigo_corto
+  columns:
+    codigo_corto: int
+    estacion: string
+    longitud: double
+    latitud: double
+    cod_dis: string          # zero-padded to 2 chars to match dim_distrito
+    nombre_distrito: string  # district name from the spatial join, not the station
+    ingestion_ts: timestamp
+    source_system: string
+    source_file: string
+    partition_key: string
+  notebook: src/data/gold/dimensions.ipynb (target=dim_estacion_aire)
 
 dim_punto_trafico:
-  grano: un punto de medida de tráfico
-  clave_natural: id
-  columnas:
-    id: BIGINT
-    distrito: BIGINT
-    tipo_elem: VARCHAR
-    nombre: VARCHAR
-    longitud: DOUBLE
-    latitud: DOUBLE
-  script: src/data/gold/dimensions.py::build_dim_punto_trafico
-  refresco_esperado: al reingestar trafico_puntos_medida (poco frecuente)
+  grain: one traffic measuring point
+  natural_key: id
+  columns:
+    id: int
+    distrito: string         # zero-padded to 2 chars
+    tipo_elem: string
+    nombre: string
+    longitud: double
+    latitud: double
+    ingestion_ts: timestamp
+    source_system: string
+    source_file: string
+    partition_key: string
+  notebook: src/data/gold/dimensions.ipynb (target=dim_punto_trafico)
+  notes: >
+    Monthly ingestion repeats each sensor ~12x. Deduplicated on partition_key
+    (the real snapshot month), not ingestion_ts, which is write time and ties
+    when a whole year is backfilled in one run.
+
+dim_distrito:
+  grain: one district
+  natural_key: cod_dis
+  columns:
+    cod_dis: string
+    nombre: string
+    geometry: string         # WKT: Spark has no geometry type
+    n_estaciones_aire: long
+    n_puntos_trafico: long
+    cobertura_aire: boolean
+  notebook: src/data/gold/dimensions.ipynb (target=dim_distrito)
+  notes: Depends on dim_estacion_aire and dim_punto_trafico being built first.
 
 dim_magnitud:
-  grano: un tipo de gas medido
-  clave_natural: codigo
-  columnas:
-    codigo: INTEGER
-    magnitud: VARCHAR
-  script: src/data/gold/dimensions.py::build_dim_magnitud
-  refresco_esperado: estático, no cambia salvo nueva magnitud oficial
+  grain: one measured gas
+  natural_key: codigo
+  columns:
+    codigo: int
+    magnitud: string
+  notebook: src/data/gold/dimensions.ipynb (target=dim_magnitud)
+  notes: >
+    Static catalogue of the 18 official codes. Only ~11 appear in real data;
+    fact_calidad_aire.magnitud stores the label, so join on magnitud, not codigo.
 
 fact_calidad_aire:
-  grano: estación x fecha x magnitud
-  clave_natural: [estacion, fecha, magnitud]
-  columnas:
-    estacion: BIGINT
-    cod_dis: VARCHAR
-    magnitud: VARCHAR
-    fecha: DATE
-    dato: DOUBLE
-    validez: VARCHAR
-  script: src/data/gold/facts.py::build_fact_calidad_aire
-  refresco_esperado: diario, tras cada re-ejecución de silver/aire
+  grain: estacion x fecha x magnitud
+  natural_key: [estacion, fecha, magnitud]
+  columns:
+    estacion: int
+    cod_dis: string
+    magnitud: string
+    fecha: date
+    dato: double
+    validez: string          # 'V' valid, 'N' measured but flagged invalid
+  notebook: src/data/gold/facts.ipynb (target=fact_calidad_aire)
+  notes: >
+    Invalid days are kept on purpose. Dropping them would make "measured but
+    invalid" indistinguishable from "never loaded" in coverage analysis.
 
 fact_trafico:
-  grano: punto x fecha
-  clave_natural: [id, fecha]
-  columnas:
-    id: BIGINT
-    distrito: BIGINT
-    fecha: TIMESTAMP
-    intensidad: DOUBLE
-    ocupacion: DOUBLE
-    carga: DOUBLE
-    vmed: DOUBLE
-    error: VARCHAR
-  script: src/data/gold/facts.py::build_fact_trafico
-  refresco_esperado: diario, tras cada re-ejecución de silver/trafico
+  grain: punto x timestamp (15 minute readings)
+  natural_key: [id, fecha]
+  columns:
+    id: int
+    distrito: string
+    fecha: timestamp
+    intensidad: double
+    ocupacion: double
+    carga: double
+    vmed: double
+    error: string
+  notebook: src/data/gold/facts.ipynb (target=fact_trafico)
+
+fact_trafico_diario:
+  grain: punto x fecha (day)
+  natural_key: [id, fecha]
+  columns:
+    id: int
+    distrito: string
+    fecha: date
+    intensidad_media: double
+    ocupacion_media: double
+    carga_media: double
+    vmed_media: double
+    lecturas: long
+    lecturas_ok: long        # readings with error = 'N'
+  notebook: src/data/gold/facts.ipynb (target=fact_trafico_diario)
+  notes: Daily rollup so coverage queries never scan the 15-minute detail table.

@@ -1,0 +1,1118 @@
+{
+  "datasets": [
+    {
+      "name": "errores",
+      "displayName": "Infra errores",
+      "queryLines": [
+        "SELECT\n",
+        "    CAST(timestamp AS TIMESTAMP)                      AS ts,\n",
+        "    CAST(timestamp AS DATE)                           AS fecha,\n",
+        "    notebook_name,\n",
+        "    error_message,\n",
+        "    status,\n",
+        "    split_part(notebook_name, '/', 1)                 AS capa,\n",
+        "    CASE WHEN status = 'FAILED'  THEN 1 ELSE 0 END    AS es_fallo,\n",
+        "    CASE WHEN status = 'SKIPPED' THEN 1 ELSE 0 END    AS es_omitido\n",
+        "FROM dev.infra.error_logs\n"
+      ]
+    },
+    {
+      "name": "carga",
+      "displayName": "Infra ingesta",
+      "queryLines": [
+        "SELECT\n",
+        "    CAST(timestamp AS TIMESTAMP) AS ts,\n",
+        "    CAST(timestamp AS DATE)      AS fecha,\n",
+        "    notebook_name,\n",
+        "    dataset_destino,\n",
+        "    partition_key,\n",
+        "    rows_written,\n",
+        "    status\n",
+        "FROM dev.infra.ingestion_log\n"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "errores",
+      "displayName": "Errores",
+      "layout": [
+        {
+          "widget": {
+            "name": "t_err",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## REGISTRO DE ERRORES"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_ano_err",
+            "queries": [
+              {
+                "name": "q0_errores",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "fecha",
+                      "expression": "`fecha`"
+                    },
+                    {
+                      "name": "fecha_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "fecha",
+                    "displayName": "Fecha",
+                    "queryName": "q0_errores"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Fecha",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_notebook",
+            "queries": [
+              {
+                "name": "q0_errores",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "notebook_name",
+                      "expression": "`notebook_name`"
+                    },
+                    {
+                      "name": "notebook_name_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "notebook_name",
+                    "displayName": "Notebook",
+                    "queryName": "q0_errores"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Notebook",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_capa",
+            "queries": [
+              {
+                "name": "q0_errores",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "capa",
+                      "expression": "`capa`"
+                    },
+                    {
+                      "name": "capa_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "capa",
+                    "displayName": "Capa",
+                    "queryName": "q0_errores"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Capa",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_status",
+            "queries": [
+              {
+                "name": "q0_errores",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "status_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "status",
+                    "displayName": "Estado",
+                    "queryName": "q0_errores"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Estado",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "n_fallos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "sum(es_fallo)",
+                      "expression": "SUM(`es_fallo`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Fallos (FAILED)",
+                  "fields": []
+                }
+              },
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(es_fallo)",
+                  "displayName": "Fallos (FAILED)"
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "n_omitidos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "n_omitidos",
+                      "expression": "SUM(`es_omitido`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Omitidos (SKIPPED)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "n_omitidos",
+                  "displayName": "Omitidos (SKIPPED)",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "n_notebooks",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "n_notebooks",
+                      "expression": "COUNT(DISTINCT `notebook_name`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Notebooks afectados",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "n_notebooks",
+                  "displayName": "Notebooks afectados",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "ultimo_error",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "ultimo_error",
+                      "expression": "MAX(`fecha`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Ultimo error",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "ultimo_error",
+                  "displayName": "Ultimo error",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "serie_errores",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "daily(ts)",
+                      "expression": "DATE_TRUNC(\"DAY\", `ts`)"
+                    },
+                    {
+                      "name": "sum(es_fallo)",
+                      "expression": "SUM(`es_fallo`)"
+                    },
+                    {
+                      "name": "sum(es_omitido)",
+                      "expression": "SUM(`es_omitido`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Errores por dia",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(ts)",
+                  "displayName": "Dia",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(es_fallo)",
+                      "displayName": "Fallos"
+                    },
+                    {
+                      "fieldName": "sum(es_omitido)",
+                      "displayName": "Omitidos"
+                    }
+                  ]
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "por_notebook",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "notebook_name",
+                      "expression": "`notebook_name`"
+                    },
+                    {
+                      "name": "count(ts)",
+                      "expression": "COUNT(`ts`)"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Errores por notebook",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "notebook_name",
+                  "displayName": "Notebook",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(ts)",
+                  "displayName": "Errores",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "status",
+                  "displayName": "Estado",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "por_estado",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "errores",
+                  "fields": [
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "count(ts)",
+                      "expression": "COUNT(`ts`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "FAILED vs SKIPPED",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "status",
+                  "displayName": "Estado",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(ts)",
+                  "displayName": "Errores",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 11,
+            "width": 6,
+            "height": 7
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "carga",
+      "displayName": "Carga",
+      "layout": [
+        {
+          "widget": {
+            "name": "t_carga",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## INFORMACION POR CARGAS DE DATOS"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_dataset",
+            "queries": [
+              {
+                "name": "q0_carga",
+                "query": {
+                  "datasetName": "carga",
+                  "fields": [
+                    {
+                      "name": "dataset_destino",
+                      "expression": "`dataset_destino`"
+                    },
+                    {
+                      "name": "dataset_destino_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "dataset_destino",
+                    "displayName": "Dataset",
+                    "queryName": "q0_carga"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Dataset",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_fecha_carga",
+            "queries": [
+              {
+                "name": "q0_carga",
+                "query": {
+                  "datasetName": "carga",
+                  "fields": [
+                    {
+                      "name": "fecha",
+                      "expression": "`fecha`"
+                    },
+                    {
+                      "name": "fecha_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "fecha",
+                    "displayName": "Fecha",
+                    "queryName": "q0_carga"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Fecha",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_status_carga",
+            "queries": [
+              {
+                "name": "q0_carga",
+                "query": {
+                  "datasetName": "carga",
+                  "fields": [
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "status_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "status",
+                    "displayName": "Estado",
+                    "queryName": "q0_carga"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Estado",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 1,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "n_filas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "carga",
+                  "fields": [
+                    {
+                      "name": "n_filas",
+                      "expression": "SUM(`rows_written`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Filas escritas",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "n_filas",
+                  "displayName": "Filas escritas",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "n_datasets",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "carga",
+                  "fields": [
+                    {
+                      "name": "n_datasets",
+                      "expression": "COUNT(DISTINCT `dataset_destino`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Datasets",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "n_datasets",
+                  "displayName": "Datasets",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "n_particiones",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "carga",
+                  "fields": [
+                    {
+                      "name": "n_particiones",
+                      "expression": "COUNT(DISTINCT `partition_key`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Particiones",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "n_particiones",
+                  "displayName": "Particiones",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "filas_por_dia",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "carga",
+                  "fields": [
+                    {
+                      "name": "daily(ts)",
+                      "expression": "DATE_TRUNC(\"DAY\", `ts`)"
+                    },
+                    {
+                      "name": "sum(rows_written)",
+                      "expression": "SUM(`rows_written`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Filas escritas por dia",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "daily(ts)",
+                  "displayName": "Dia",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(rows_written)",
+                  "displayName": "Filas",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "filas_por_dataset",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "carga",
+                  "fields": [
+                    {
+                      "name": "dataset_destino",
+                      "expression": "`dataset_destino`"
+                    },
+                    {
+                      "name": "sum(rows_written)",
+                      "expression": "SUM(`rows_written`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Filas por dataset",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "dataset_destino",
+                  "displayName": "Dataset",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(rows_written)",
+                  "displayName": "Filas",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "filas_por_particion",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "carga",
+                  "fields": [
+                    {
+                      "name": "partition_key",
+                      "expression": "`partition_key`"
+                    },
+                    {
+                      "name": "sum(rows_written)",
+                      "expression": "SUM(`rows_written`)"
+                    },
+                    {
+                      "name": "dataset_destino",
+                      "expression": "`dataset_destino`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Filas por particion",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "partition_key",
+                  "displayName": "Particion",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(rows_written)",
+                  "displayName": "Filas",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "dataset_destino",
+                  "displayName": "Dataset",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 11,
+            "width": 6,
+            "height": 7
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "LEFT"
+    },
+    "applyModeEnabled": false
+  }
+}

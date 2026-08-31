@@ -1,0 +1,1429 @@
+{
+  "datasets": [
+    {
+      "name": "experimentos_resumen",
+      "displayName": "Experimentos resumen",
+      "queryLines": [
+        "WITH run_agg AS (\n",
+        "    SELECT\n",
+        "        experiment_id,\n",
+        "        COUNT(*)                                            AS n_runs,\n",
+        "        SUM(CASE WHEN status = 'FAILED'  THEN 1 ELSE 0 END) AS n_failed,\n",
+        "        SUM(CASE WHEN status = 'RUNNING' THEN 1 ELSE 0 END) AS n_running,\n",
+        "        MAX(start_time)                                     AS ultimo_run\n",
+        "    FROM system.mlflow.runs_latest\n",
+        "    GROUP BY experiment_id\n",
+        ")\n",
+        "SELECT\n",
+        "    e.experiment_id,\n",
+        "    e.name,\n",
+        "    regexp_extract(e.name, '/forecast_experiments/(.*)$', 1) AS experimento,\n",
+        "    e.create_time,\n",
+        "    e.update_time,\n",
+        "    COALESCE(r.n_runs, 0)    AS n_runs,\n",
+        "    COALESCE(r.n_failed, 0)  AS n_failed,\n",
+        "    COALESCE(r.n_running, 0) AS n_running,\n",
+        "    r.ultimo_run,\n",
+        "    CASE\n",
+        "        WHEN COALESCE(r.n_failed, 0) > 0  THEN 'fallido'\n",
+        "        WHEN COALESCE(r.n_runs, 0) = 0    THEN 'vacio_pendiente'\n",
+        "        WHEN COALESCE(r.n_running, 0) > 0 THEN 'en_curso'\n",
+        "        ELSE 'hecho'\n",
+        "    END AS status_bucket\n",
+        "FROM system.mlflow.experiments_latest e\n",
+        "LEFT JOIN run_agg r ON r.experiment_id = e.experiment_id\n",
+        "WHERE e.name LIKE '/Users/formacionjosabi5@gmail.com/forecast_experiments/%'\n",
+        "  AND e.delete_time IS NULL\n"
+      ]
+    },
+    {
+      "name": "experimento_runs",
+      "displayName": "Runs de un experimento",
+      "queryLines": [
+        "WITH exploded AS (\n",
+        "    SELECT\n",
+        "        r.run_id,\n",
+        "        r.experiment_id,\n",
+        "        r.run_name,\n",
+        "        r.status,\n",
+        "        r.start_time,\n",
+        "        r.end_time,\n",
+        "        r.params['model_type']    AS model_type,\n",
+        "        r.params['max_depth']     AS max_depth,\n",
+        "        r.params['max_iter']      AS max_iter,\n",
+        "        r.params['n_estimators']  AS n_estimators,\n",
+        "        r.params['learning_rate'] AS learning_rate,\n",
+        "        r.params['num_leaves']    AS num_leaves,\n",
+        "        m.metric_name,\n",
+        "        m.latest_value\n",
+        "    FROM system.mlflow.runs_latest r\n",
+        "    LATERAL VIEW explode(r.aggregated_metrics) t AS m\n",
+        ")\n",
+        "SELECT\n",
+        "    e.name                                                   AS experimento,\n",
+        "    regexp_extract(e.name, '/forecast_experiments/(.*)$', 1) AS experimento_nombre,\n",
+        "    ex.run_id,\n",
+        "    ex.run_name,\n",
+        "    ex.status,\n",
+        "    ex.start_time,\n",
+        "    ex.end_time,\n",
+        "    ex.model_type,\n",
+        "    ex.max_depth,\n",
+        "    ex.max_iter,\n",
+        "    ex.n_estimators,\n",
+        "    ex.learning_rate,\n",
+        "    ex.num_leaves,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'mae'   THEN ex.latest_value END) AS mae,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'rmse'  THEN ex.latest_value END) AS rmse,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'smape' THEN ex.latest_value END) AS smape\n",
+        "FROM exploded ex\n",
+        "JOIN system.mlflow.experiments_latest e ON e.experiment_id = ex.experiment_id\n",
+        "WHERE e.name LIKE '/Users/formacionjosabi5@gmail.com/forecast_experiments/%'\n",
+        "GROUP BY e.name, ex.run_id, ex.run_name, ex.status, ex.start_time, ex.end_time,\n",
+        "         ex.model_type, ex.max_depth, ex.max_iter, ex.n_estimators, ex.learning_rate, ex.num_leaves\n"
+      ]
+    },
+    {
+      "name": "versiones_best",
+      "displayName": "Versiones (_best)",
+      "queryLines": [
+        "SELECT r.run_id\n",
+        "FROM system.mlflow.runs_latest r\n",
+        "JOIN system.mlflow.experiments_latest e ON e.experiment_id = r.experiment_id\n",
+        "WHERE e.name LIKE '/Users/formacionjosabi5@gmail.com/forecast_experiments/%'\n",
+        "  AND r.run_name LIKE '%_best'\n"
+      ]
+    },
+    {
+      "name": "predicciones_features",
+      "displayName": "Predicciones features",
+      "queryLines": [
+        "SELECT 'no2' AS gas, f.fecha, f.cod_dis, di.nombre AS distrito,\n",
+        "       f.valor_medio, f.n_estaciones, f.es_festivo, f.num_fabricas_distrito\n",
+        "FROM dev.ml.features_no2 f\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = lpad(f.cod_dis, 2, '0')\n",
+        "UNION ALL\n",
+        "SELECT 'pm10' AS gas, f.fecha, f.cod_dis, di.nombre AS distrito,\n",
+        "       f.valor_medio, f.n_estaciones, f.es_festivo, f.num_fabricas_distrito\n",
+        "FROM dev.ml.features_pm10 f\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = lpad(f.cod_dis, 2, '0')\n",
+        "-- next gas: add another UNION ALL SELECT block here, same columns, table name changed\n"
+      ]
+    },
+    {
+      "name": "continuidad",
+      "displayName": "Continuidad historico + forecast",
+      "queryLines": [
+        "WITH hist_raw AS (\n",
+        "    SELECT 'no2' AS gas, cod_dis, fecha, valor_medio AS valor,\n",
+        "           MAX(fecha) OVER (PARTITION BY cod_dis) AS ultimo_distrito\n",
+        "    FROM dev.ml.features_no2\n",
+        "    UNION ALL\n",
+        "    SELECT 'pm10' AS gas, cod_dis, fecha, valor_medio AS valor,\n",
+        "           MAX(fecha) OVER (PARTITION BY cod_dis) AS ultimo_distrito\n",
+        "    FROM dev.ml.features_pm10\n",
+        "    -- next gas: add another UNION ALL SELECT block here\n",
+        "),\n",
+        "hist AS (\n",
+        "    SELECT gas, cod_dis, fecha, valor, 'historico' AS serie\n",
+        "    FROM hist_raw\n",
+        "    WHERE fecha >= date_sub(ultimo_distrito, 30)\n",
+        "),\n",
+        "pred AS (\n",
+        "    SELECT 'no2' AS gas, distrito AS cod_dis, fecha, valor_predicho AS valor, 'prediccion' AS serie\n",
+        "    FROM dev.ml.forecast_no2_7\n",
+        "    UNION ALL\n",
+        "    SELECT 'pm10' AS gas, distrito AS cod_dis, fecha, valor_predicho AS valor, 'prediccion' AS serie\n",
+        "    FROM dev.ml.forecast_pm10_7\n",
+        "    -- next gas: add another UNION ALL SELECT block here\n",
+        ")\n",
+        "SELECT c.gas, c.cod_dis, di.nombre AS distrito, c.fecha, c.valor, c.serie\n",
+        "FROM (SELECT * FROM hist UNION ALL SELECT * FROM pred) c\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = lpad(c.cod_dis, 2, '0')\n"
+      ]
+    },
+    {
+      "name": "predicciones_forecast",
+      "displayName": "Predicciones forecast",
+      "queryLines": [
+        "SELECT 'no2' AS gas, f.distrito AS cod_dis, di.nombre AS distrito_nombre, f.fecha, f.valor_predicho\n",
+        "FROM dev.ml.forecast_no2_7 f\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = lpad(f.distrito, 2, '0')\n",
+        "UNION ALL\n",
+        "SELECT 'pm10' AS gas, f.distrito AS cod_dis, di.nombre AS distrito_nombre, f.fecha, f.valor_predicho\n",
+        "FROM dev.ml.forecast_pm10_7 f\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = lpad(f.distrito, 2, '0')\n",
+        "-- next gas: add another UNION ALL SELECT block here\n"
+      ]
+    },
+    {
+      "name": "continuidad_distrito",
+      "displayName": "Continuidad modelo distrito",
+      "queryLines": [
+        "WITH hist_raw AS (\n",
+        "    SELECT cod_dis, fecha, valor_medio AS valor,\n",
+        "           MAX(fecha) OVER (PARTITION BY cod_dis) AS ultimo_distrito\n",
+        "    FROM dev.ml.features_no2_D16_7\n",
+        "    -- next gas/distrito: add another UNION ALL SELECT block here\n",
+        "),\n",
+        "hist AS (\n",
+        "    SELECT cod_dis, fecha, valor, 'historico' AS serie\n",
+        "    FROM hist_raw\n",
+        "    WHERE fecha >= date_sub(ultimo_distrito, 30)\n",
+        "),\n",
+        "pred AS (\n",
+        "    SELECT distrito AS cod_dis, fecha, valor_predicho AS valor, 'prediccion D16' AS serie\n",
+        "    FROM dev.ml.forecast_no2_D16_7\n",
+        "    -- next gas/distrito: add another UNION ALL SELECT block here\n",
+        ")\n",
+        "SELECT 'no2' AS gas, c.cod_dis, di.nombre AS distrito, c.fecha, c.valor, c.serie\n",
+        "FROM (SELECT * FROM hist UNION ALL SELECT * FROM pred) c\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = lpad(c.cod_dis, 2, '0')"
+      ]
+    },
+    {
+      "name": "forecast_distrito",
+      "displayName": "Forecast modelo distrito",
+      "queryLines": [
+        "SELECT 'no2' AS gas, 'D16' AS modelo, f.distrito AS cod_dis,\n",
+        "       di.nombre AS distrito_nombre, f.fecha, f.valor_predicho\n",
+        "FROM dev.ml.forecast_no2_D16_7 f\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = lpad(f.distrito, 2, '0')\n",
+        "-- next gas/distrito: add another UNION ALL SELECT block here"
+      ]
+    },
+    {
+      "name": "metricas_distrito",
+      "displayName": "Metricas por horizonte (distrito)",
+      "queryLines": [
+        "WITH exploded AS (\n",
+        "    SELECT\n",
+        "        r.run_id,\n",
+        "        r.experiment_id,\n",
+        "        r.run_name,\n",
+        "        r.status,\n",
+        "        r.start_time,\n",
+        "        r.params['model_type'] AS model_type,\n",
+        "        m.metric_name,\n",
+        "        m.latest_value\n",
+        "    FROM system.mlflow.runs_latest r\n",
+        "    LATERAL VIEW explode(r.aggregated_metrics) t AS m\n",
+        ")\n",
+        "SELECT\n",
+        "    regexp_extract(e.name, '/forecast_experiments/(.*)$', 1) AS experimento,\n",
+        "    ex.run_name,\n",
+        "    ex.model_type,\n",
+        "    ex.status,\n",
+        "    ex.start_time,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'mae_7d' THEN ex.latest_value END) AS mae_7d,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'mae'    THEN ex.latest_value END) AS mae_1paso,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'smape'  THEN ex.latest_value END) AS smape,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'mae_h1' THEN ex.latest_value END) AS mae_h1,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'mae_h2' THEN ex.latest_value END) AS mae_h2,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'mae_h3' THEN ex.latest_value END) AS mae_h3,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'mae_h4' THEN ex.latest_value END) AS mae_h4,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'mae_h5' THEN ex.latest_value END) AS mae_h5,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'mae_h6' THEN ex.latest_value END) AS mae_h6,\n",
+        "    MAX(CASE WHEN ex.metric_name = 'mae_h7' THEN ex.latest_value END) AS mae_h7\n",
+        "FROM exploded ex\n",
+        "JOIN system.mlflow.experiments_latest e ON e.experiment_id = ex.experiment_id\n",
+        "WHERE e.name LIKE '/Users/formacionjosabi5@gmail.com/forecast_experiments/no2_D%'\n",
+        "GROUP BY e.name, ex.run_name, ex.model_type, ex.status, ex.start_time"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "experimentos",
+      "displayName": "Experimentos ML",
+      "layout": [
+        {
+          "widget": {
+            "name": "t_exp",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Experimentos ML"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_experimento",
+            "queries": [
+              {
+                "name": "q0_experimentos_resumen",
+                "query": {
+                  "datasetName": "experimentos_resumen",
+                  "fields": [
+                    {
+                      "name": "experimento",
+                      "expression": "`experimento`"
+                    },
+                    {
+                      "name": "experimento_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q1_experimento_runs",
+                "query": {
+                  "datasetName": "experimento_runs",
+                  "fields": [
+                    {
+                      "name": "experimento_nombre",
+                      "expression": "`experimento_nombre`"
+                    },
+                    {
+                      "name": "experimento_nombre_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "experimento",
+                    "displayName": "Experimento",
+                    "queryName": "q0_experimentos_resumen"
+                  },
+                  {
+                    "fieldName": "experimento_nombre",
+                    "displayName": "Experimento",
+                    "queryName": "q1_experimento_runs"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Experimento",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "total_experimentos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "experimentos_resumen",
+                  "fields": [
+                    {
+                      "name": "total_experimentos",
+                      "expression": "COUNT(*)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Total experimentos",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "total_experimentos",
+                  "displayName": "Total experimentos",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "total_versiones",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "versiones_best",
+                  "fields": [
+                    {
+                      "name": "total_versiones",
+                      "expression": "COUNT(*)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Versiones (_best)",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "total_versiones",
+                  "displayName": "Versiones (_best)",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_experimentos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "experimentos_resumen",
+                  "fields": [
+                    {
+                      "name": "experimento",
+                      "expression": "`experimento`"
+                    },
+                    {
+                      "name": "status_bucket",
+                      "expression": "`status_bucket`"
+                    },
+                    {
+                      "name": "n_runs",
+                      "expression": "`n_runs`"
+                    },
+                    {
+                      "name": "n_failed",
+                      "expression": "`n_failed`"
+                    },
+                    {
+                      "name": "ultimo_run",
+                      "expression": "`ultimo_run`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "title": "Experimentos",
+                "showTitle": true
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "experimento",
+                    "displayName": "Experimento",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "status_bucket",
+                    "displayName": "Estado",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "n_runs",
+                    "displayName": "Runs",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "n_failed",
+                    "displayName": "Fallidos",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "ultimo_run",
+                    "displayName": "Ultimo run",
+                    "type": "string"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 12,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_runs",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "experimento_runs",
+                  "fields": [
+                    {
+                      "name": "run_name",
+                      "expression": "`run_name`"
+                    },
+                    {
+                      "name": "status",
+                      "expression": "`status`"
+                    },
+                    {
+                      "name": "model_type",
+                      "expression": "`model_type`"
+                    },
+                    {
+                      "name": "max_depth",
+                      "expression": "`max_depth`"
+                    },
+                    {
+                      "name": "max_iter",
+                      "expression": "`max_iter`"
+                    },
+                    {
+                      "name": "n_estimators",
+                      "expression": "`n_estimators`"
+                    },
+                    {
+                      "name": "learning_rate",
+                      "expression": "`learning_rate`"
+                    },
+                    {
+                      "name": "num_leaves",
+                      "expression": "`num_leaves`"
+                    },
+                    {
+                      "name": "mae",
+                      "expression": "`mae`"
+                    },
+                    {
+                      "name": "rmse",
+                      "expression": "`rmse`"
+                    },
+                    {
+                      "name": "smape",
+                      "expression": "`smape`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "title": "Runs del experimento seleccionado",
+                "showTitle": true
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "run_name",
+                    "displayName": "Run",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "status",
+                    "displayName": "Estado",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "model_type",
+                    "displayName": "Modelo",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "max_depth",
+                    "displayName": "max_depth",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "max_iter",
+                    "displayName": "max_iter",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "n_estimators",
+                    "displayName": "n_estimators",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "learning_rate",
+                    "displayName": "learning_rate",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "num_leaves",
+                    "displayName": "num_leaves",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "mae",
+                    "displayName": "MAE",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "rmse",
+                    "displayName": "RMSE",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "smape",
+                    "displayName": "SMAPE",
+                    "type": "string"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 12,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "predicciones",
+      "displayName": "Predicciones",
+      "layout": [
+        {
+          "widget": {
+            "name": "t_pred",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Predicciones"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_gas",
+            "queries": [
+              {
+                "name": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d33141242b0d3c05fc1c94bc4_gas",
+                "query": {
+                  "datasetName": "predicciones_features",
+                  "fields": [
+                    {
+                      "name": "gas",
+                      "expression": "`gas`"
+                    },
+                    {
+                      "name": "gas_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d3314124bb541e396693eb53d_gas",
+                "query": {
+                  "datasetName": "predicciones_forecast",
+                  "fields": [
+                    {
+                      "name": "gas",
+                      "expression": "`gas`"
+                    },
+                    {
+                      "name": "gas_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d331412468219150b7417a736_gas",
+                "query": {
+                  "datasetName": "continuidad",
+                  "fields": [
+                    {
+                      "name": "gas",
+                      "expression": "`gas`"
+                    },
+                    {
+                      "name": "gas_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "disallowAll": true,
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "no2"
+                      }
+                    ]
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Gas",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "gas",
+                    "queryName": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d33141242b0d3c05fc1c94bc4_gas"
+                  },
+                  {
+                    "fieldName": "gas",
+                    "queryName": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d3314124bb541e396693eb53d_gas"
+                  },
+                  {
+                    "fieldName": "gas",
+                    "queryName": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d331412468219150b7417a736_gas"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_distrito",
+            "queries": [
+              {
+                "name": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d33141242b0d3c05fc1c94bc4_distrito",
+                "query": {
+                  "datasetName": "predicciones_features",
+                  "fields": [
+                    {
+                      "name": "distrito",
+                      "expression": "`distrito`"
+                    },
+                    {
+                      "name": "distrito_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d3314124bb541e396693eb53d_distrito_nombre",
+                "query": {
+                  "datasetName": "predicciones_forecast",
+                  "fields": [
+                    {
+                      "name": "distrito_nombre",
+                      "expression": "`distrito_nombre`"
+                    },
+                    {
+                      "name": "distrito_nombre_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d331412468219150b7417a736_distrito",
+                "query": {
+                  "datasetName": "continuidad",
+                  "fields": [
+                    {
+                      "name": "distrito",
+                      "expression": "`distrito`"
+                    },
+                    {
+                      "name": "distrito_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "disallowAll": true,
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "Salamanca"
+                      }
+                    ]
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "showDescription": false,
+                "title": {
+                  "value": "Distrito",
+                  "fields": []
+                }
+              },
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "distrito",
+                    "queryName": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d33141242b0d3c05fc1c94bc4_distrito"
+                  },
+                  {
+                    "fieldName": "distrito_nombre",
+                    "queryName": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d3314124bb541e396693eb53d_distrito_nombre"
+                  },
+                  {
+                    "fieldName": "distrito",
+                    "queryName": "dashboards/01f1a565a5031182bb00609383004fb3/datasets/01f1a56d331412468219150b7417a736_distrito"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "grafica_continuidad",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "continuidad",
+                  "fields": [
+                    {
+                      "name": "fecha",
+                      "expression": "`fecha`"
+                    },
+                    {
+                      "name": "avg(valor)",
+                      "expression": "AVG(`valor`)"
+                    },
+                    {
+                      "name": "serie",
+                      "expression": "`serie`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Historico (30 dias) + forecast (7 dias)",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "fecha",
+                  "displayName": "Fecha",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(valor)",
+                  "displayName": "Valor",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "serie",
+                  "displayName": "Serie",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 12,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_features",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "predicciones_features",
+                  "fields": [
+                    {
+                      "name": "gas",
+                      "expression": "`gas`"
+                    },
+                    {
+                      "name": "distrito",
+                      "expression": "`distrito`"
+                    },
+                    {
+                      "name": "fecha",
+                      "expression": "`fecha`"
+                    },
+                    {
+                      "name": "valor_medio",
+                      "expression": "`valor_medio`"
+                    },
+                    {
+                      "name": "n_estaciones",
+                      "expression": "`n_estaciones`"
+                    },
+                    {
+                      "name": "es_festivo",
+                      "expression": "`es_festivo`"
+                    },
+                    {
+                      "name": "num_fabricas_distrito",
+                      "expression": "`num_fabricas_distrito`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "title": "Features (detalle)",
+                "showTitle": true
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "gas",
+                    "displayName": "Gas",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "distrito",
+                    "displayName": "Distrito",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "fecha",
+                    "displayName": "Fecha",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "valor_medio",
+                    "displayName": "Valor medio",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "n_estaciones",
+                    "displayName": "N estaciones",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "es_festivo",
+                    "displayName": "Festivo",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "num_fabricas_distrito",
+                    "displayName": "Num fabricas",
+                    "type": "string"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 12,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_forecast",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "predicciones_forecast",
+                  "fields": [
+                    {
+                      "name": "gas",
+                      "expression": "`gas`"
+                    },
+                    {
+                      "name": "distrito_nombre",
+                      "expression": "`distrito_nombre`"
+                    },
+                    {
+                      "name": "fecha",
+                      "expression": "`fecha`"
+                    },
+                    {
+                      "name": "valor_predicho",
+                      "expression": "`valor_predicho`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "title": "Forecast (detalle)",
+                "showTitle": true
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "gas",
+                    "displayName": "Gas",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "distrito_nombre",
+                    "displayName": "Distrito",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "fecha",
+                    "displayName": "Fecha",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "valor_predicho",
+                    "displayName": "Valor predicho",
+                    "type": "string"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 20,
+            "width": 12,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "modelo_distrito",
+      "displayName": "Modelo distrito",
+      "layout": [
+        {
+          "widget": {
+            "name": "t_dist",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Modelo por distrito (no2 D16)"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "grafica_continuidad_distrito",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "continuidad_distrito",
+                  "fields": [
+                    {
+                      "name": "fecha",
+                      "expression": "`fecha`"
+                    },
+                    {
+                      "name": "avg(valor)",
+                      "expression": "AVG(`valor`)"
+                    },
+                    {
+                      "name": "serie",
+                      "expression": "`serie`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Historico (30 dias) + forecast D16 (7 dias)",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "fecha",
+                  "displayName": "Fecha",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(valor)",
+                  "displayName": "Valor",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "serie",
+                  "displayName": "Serie",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 12,
+            "height": 10
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_forecast_distrito",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "forecast_distrito",
+                  "fields": [
+                    {
+                      "name": "gas",
+                      "expression": "`gas`"
+                    },
+                    {
+                      "name": "modelo",
+                      "expression": "`modelo`"
+                    },
+                    {
+                      "name": "distrito_nombre",
+                      "expression": "`distrito_nombre`"
+                    },
+                    {
+                      "name": "fecha",
+                      "expression": "`fecha`"
+                    },
+                    {
+                      "name": "valor_predicho",
+                      "expression": "`valor_predicho`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "title": "Forecast D16 (detalle)",
+                "showTitle": true
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "gas",
+                    "displayName": "Gas",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "modelo",
+                    "displayName": "Modelo",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "distrito_nombre",
+                    "displayName": "Distrito",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "fecha",
+                    "displayName": "Fecha",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "valor_predicho",
+                    "displayName": "Valor predicho",
+                    "type": "string"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 5,
+            "height": 8
+          }
+        },
+        {
+          "widget": {
+            "name": "tabla_metricas_distrito",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "metricas_distrito",
+                  "fields": [
+                    {
+                      "name": "experimento",
+                      "expression": "`experimento`"
+                    },
+                    {
+                      "name": "model_type",
+                      "expression": "`model_type`"
+                    },
+                    {
+                      "name": "mae_7d",
+                      "expression": "`mae_7d`"
+                    },
+                    {
+                      "name": "mae_1paso",
+                      "expression": "`mae_1paso`"
+                    },
+                    {
+                      "name": "mae_h1",
+                      "expression": "`mae_h1`"
+                    },
+                    {
+                      "name": "mae_h2",
+                      "expression": "`mae_h2`"
+                    },
+                    {
+                      "name": "mae_h3",
+                      "expression": "`mae_h3`"
+                    },
+                    {
+                      "name": "mae_h4",
+                      "expression": "`mae_h4`"
+                    },
+                    {
+                      "name": "mae_h5",
+                      "expression": "`mae_h5`"
+                    },
+                    {
+                      "name": "mae_h6",
+                      "expression": "`mae_h6`"
+                    },
+                    {
+                      "name": "mae_h7",
+                      "expression": "`mae_h7`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "title": "MAE por horizonte y modelo",
+                "showTitle": true
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "experimento",
+                    "displayName": "Experimento",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "model_type",
+                    "displayName": "Modelo",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "mae_7d",
+                    "displayName": "MAE 7d",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "mae_1paso",
+                    "displayName": "MAE 1 paso",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "mae_h1",
+                    "displayName": "h1",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "mae_h2",
+                    "displayName": "h2",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "mae_h3",
+                    "displayName": "h3",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "mae_h4",
+                    "displayName": "h4",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "mae_h5",
+                    "displayName": "h5",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "mae_h6",
+                    "displayName": "h6",
+                    "type": "string"
+                  },
+                  {
+                    "fieldName": "mae_h7",
+                    "displayName": "h7",
+                    "type": "string"
+                  }
+                ]
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 12,
+            "width": 7,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "LEFT"
+    },
+    "applyModeEnabled": false
+  }
+}

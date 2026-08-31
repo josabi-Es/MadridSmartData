@@ -1,0 +1,1757 @@
+{
+  "datasets": [
+    {
+      "name": "air_facts",
+      "displayName": "Aire detalle",
+      "queryLines": [
+        "SELECT\n",
+        "    f.fecha,\n",
+        "    d.ano,\n",
+        "    d.mes,\n",
+        "    d.nombre_mes,\n",
+        "    f.estacion,\n",
+        "    e.estacion            AS nombre_estacion,\n",
+        "    f.magnitud,\n",
+        "    f.cod_dis,\n",
+        "    di.nombre             AS distrito,\n",
+        "    f.dato,\n",
+        "    f.validez,\n",
+        "    CASE WHEN f.validez = 'V' THEN 1 ELSE 0 END AS es_valido,\n",
+        "    CASE WHEN f.validez = 'N' THEN 1 ELSE 0 END AS es_invalido,\n",
+        "    CASE WHEN f.validez = 'V' THEN f.dato END   AS dato_valido\n",
+        "FROM dev.gold.fact_calidad_aire f\n",
+        "JOIN dev.gold.dim_fecha d          ON d.fecha = f.fecha\n",
+        "LEFT JOIN dev.gold.dim_estacion_aire e ON e.codigo_corto = f.estacion\n",
+        "LEFT JOIN dev.gold.dim_distrito di     ON di.cod_dis = f.cod_dis\n"
+      ]
+    },
+    {
+      "name": "air_coverage",
+      "displayName": "Aire cobertura",
+      "queryLines": [
+        "WITH pares AS (\n",
+        "    SELECT DISTINCT estacion, magnitud, cod_dis\n",
+        "    FROM dev.gold.fact_calidad_aire\n",
+        "),\n",
+        "grid AS (\n",
+        "    SELECT p.estacion, p.magnitud, p.cod_dis, c.fecha, c.ano, c.mes, c.nombre_mes\n",
+        "    FROM pares p\n",
+        "    CROSS JOIN dev.gold.dim_fecha c\n",
+        "),\n",
+        "marcado AS (\n",
+        "    SELECT g.estacion, g.magnitud, g.cod_dis, g.ano, g.mes, g.nombre_mes,\n",
+        "           CASE WHEN f.validez = 'V' THEN 'valido'\n",
+        "                WHEN f.validez = 'N' THEN 'medido invalido'\n",
+        "                ELSE 'sin dato' END AS estado\n",
+        "    FROM grid g\n",
+        "    LEFT JOIN dev.gold.fact_calidad_aire f\n",
+        "           ON f.estacion = g.estacion\n",
+        "          AND f.magnitud = g.magnitud\n",
+        "          AND f.fecha    = g.fecha\n",
+        ")\n",
+        "SELECT m.estacion,\n",
+        "       e.estacion AS nombre_estacion,\n",
+        "       m.magnitud,\n",
+        "       m.cod_dis,\n",
+        "       di.nombre  AS distrito,\n",
+        "       m.ano, m.mes, m.nombre_mes,\n",
+        "       m.estado,\n",
+        "       count(*)   AS dias\n",
+        "FROM marcado m\n",
+        "LEFT JOIN dev.gold.dim_estacion_aire e ON e.codigo_corto = m.estacion\n",
+        "LEFT JOIN dev.gold.dim_distrito di     ON di.cod_dis = m.cod_dis\n",
+        "GROUP BY m.estacion, e.estacion, m.magnitud, m.cod_dis, di.nombre,\n",
+        "         m.ano, m.mes, m.nombre_mes, m.estado\n"
+      ]
+    },
+    {
+      "name": "traffic",
+      "displayName": "Trafico diario",
+      "queryLines": [
+        "SELECT d.ano, d.mes, d.nombre_mes, t.fecha,\n",
+        "       t.distrito, di.nombre AS distrito_nombre,\n",
+        "       t.intensidad_media, t.ocupacion_media, t.carga_media, t.vmed_media,\n",
+        "       stack(4,\n",
+        "             'intensidad', t.intensidad_media,\n",
+        "             'ocupacion',  t.ocupacion_media,\n",
+        "             'carga',      t.carga_media,\n",
+        "             'vmed',       t.vmed_media) AS (metrica, valor),\n",
+        "       t.lecturas, t.lecturas_ok, t.id\n",
+        "FROM dev.gold.fact_trafico_diario t\n",
+        "JOIN dev.gold.dim_fecha d      ON d.fecha = t.fecha\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = t.distrito\n"
+      ]
+    },
+    {
+      "name": "mapa_aire",
+      "displayName": "Mapa aire",
+      "queryLines": [
+        "SELECT m.cod_dis, di.nombre AS distrito, di.centroid_lat, di.centroid_lon,\n",
+        "       m.magnitud, m.ano, m.mes, m.dato_medio, m.nivel_riesgo\n",
+        "FROM dev.ml.mart_mapa_aire m\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = m.cod_dis\n"
+      ]
+    },
+    {
+      "name": "mapa_trafico",
+      "displayName": "Mapa trafico",
+      "queryLines": [
+        "SELECT t.distrito AS cod_dis, di.nombre AS distrito, di.centroid_lat, di.centroid_lon,\n",
+        "       t.ano, t.mes,\n",
+        "       stack(4,\n",
+        "             'intensidad', t.intensidad_media,\n",
+        "             'ocupacion',  t.ocupacion_media,\n",
+        "             'carga',      t.carga_media,\n",
+        "             'vmed',       t.vmed_media) AS (metrica, valor),\n",
+        "       t.lecturas, t.lecturas_ok\n",
+        "FROM dev.ml.mart_mapa_trafico t\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = t.distrito\n"
+      ]
+    },
+    {
+      "name": "mapa_detalle",
+      "displayName": "Mapa detalle",
+      "queryLines": [
+        "SELECT a.cod_dis, di.nombre AS distrito, a.ano, a.mes,\n",
+        "       a.magnitud, a.dato_medio, a.nivel_riesgo,\n",
+        "       t.metrica, t.valor AS valor_trafico\n",
+        "FROM dev.ml.mart_mapa_aire a\n",
+        "JOIN (\n",
+        "    SELECT distrito AS cod_dis, ano, mes,\n",
+        "           stack(4, 'intensidad', intensidad_media, 'ocupacion', ocupacion_media,\n",
+        "                    'carga', carga_media, 'vmed', vmed_media) AS (metrica, valor)\n",
+        "    FROM dev.ml.mart_mapa_trafico\n",
+        ") t ON t.cod_dis = a.cod_dis AND t.ano = a.ano AND t.mes = a.mes\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = a.cod_dis\n"
+      ]
+    },
+    {
+      "name": "mapa_correlacion",
+      "displayName": "Mapa correlacion",
+      "queryLines": [
+        "WITH aire AS (\n",
+        "    SELECT ano, mes, magnitud, avg(dato_medio) AS dato_medio\n",
+        "    FROM dev.ml.mart_mapa_aire\n",
+        "    GROUP BY ano, mes, magnitud\n",
+        "),\n",
+        "trafico AS (\n",
+        "    SELECT ano, mes, metrica, avg(valor) AS valor_trafico\n",
+        "    FROM (\n",
+        "        SELECT ano, mes,\n",
+        "               stack(4, 'intensidad', intensidad_media, 'ocupacion', ocupacion_media,\n",
+        "                        'carga', carga_media, 'vmed', vmed_media) AS (metrica, valor)\n",
+        "        FROM dev.ml.mart_mapa_trafico\n",
+        "    )\n",
+        "    GROUP BY ano, mes, metrica\n",
+        ")\n",
+        "SELECT aire.ano, aire.mes, make_date(aire.ano, aire.mes, 1) AS fecha_mes,\n",
+        "       aire.magnitud, aire.dato_medio,\n",
+        "       trafico.metrica, trafico.valor_trafico\n",
+        "FROM aire\n",
+        "JOIN trafico ON aire.ano = trafico.ano AND aire.mes = trafico.mes\n"
+      ]
+    },
+    {
+      "name": "traffic_coverage",
+      "displayName": "Trafico cobertura",
+      "queryLines": [
+        "WITH rango AS (\n",
+        "    SELECT min(fecha) AS min_fecha, max(fecha) AS max_fecha\n",
+        "    FROM dev.gold.fact_trafico_diario\n",
+        "),\n",
+        "calendario AS (\n",
+        "    SELECT explode(sequence(min_fecha, max_fecha, interval 1 day)) AS fecha\n",
+        "    FROM rango\n",
+        "),\n",
+        "distritos AS (\n",
+        "    SELECT DISTINCT distrito FROM dev.gold.fact_trafico_diario\n",
+        "),\n",
+        "grid AS (\n",
+        "    SELECT ds.distrito, c.fecha,\n",
+        "           year(c.fecha) AS ano, month(c.fecha) AS mes,\n",
+        "           date_format(c.fecha, 'MMM') AS nombre_mes\n",
+        "    FROM distritos ds\n",
+        "    CROSS JOIN calendario c\n",
+        "),\n",
+        "real AS (\n",
+        "    SELECT DISTINCT distrito, fecha FROM dev.gold.fact_trafico_diario\n",
+        ")\n",
+        "SELECT g.distrito, di.nombre AS distrito_nombre, g.ano, g.mes, g.nombre_mes,\n",
+        "       CASE WHEN r.fecha IS NOT NULL THEN 1 ELSE 0 END AS tiene_dato\n",
+        "FROM grid g\n",
+        "LEFT JOIN real r ON r.distrito = g.distrito AND r.fecha = g.fecha\n",
+        "LEFT JOIN dev.gold.dim_distrito di ON di.cod_dis = g.distrito\n"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "aire",
+      "displayName": "Calidad del aire",
+      "layout": [
+        {
+          "widget": {
+            "name": "t_air",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Calidad del aire"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_ano",
+            "queries": [
+              {
+                "name": "q0_air_facts",
+                "query": {
+                  "datasetName": "air_facts",
+                  "fields": [
+                    {
+                      "name": "ano",
+                      "expression": "`ano`"
+                    },
+                    {
+                      "name": "ano_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q1_air_coverage",
+                "query": {
+                  "datasetName": "air_coverage",
+                  "fields": [
+                    {
+                      "name": "ano",
+                      "expression": "`ano`"
+                    },
+                    {
+                      "name": "ano_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "ano",
+                    "displayName": "Ano",
+                    "queryName": "q0_air_facts"
+                  },
+                  {
+                    "fieldName": "ano",
+                    "displayName": "Ano",
+                    "queryName": "q1_air_coverage"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Ano",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_distrito",
+            "queries": [
+              {
+                "name": "q0_air_facts",
+                "query": {
+                  "datasetName": "air_facts",
+                  "fields": [
+                    {
+                      "name": "distrito",
+                      "expression": "`distrito`"
+                    },
+                    {
+                      "name": "distrito_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q1_air_coverage",
+                "query": {
+                  "datasetName": "air_coverage",
+                  "fields": [
+                    {
+                      "name": "distrito",
+                      "expression": "`distrito`"
+                    },
+                    {
+                      "name": "distrito_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "distrito",
+                    "displayName": "Distrito",
+                    "queryName": "q0_air_facts"
+                  },
+                  {
+                    "fieldName": "distrito",
+                    "displayName": "Distrito",
+                    "queryName": "q1_air_coverage"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Distrito",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_magnitud",
+            "queries": [
+              {
+                "name": "q0_air_facts",
+                "query": {
+                  "datasetName": "air_facts",
+                  "fields": [
+                    {
+                      "name": "magnitud",
+                      "expression": "`magnitud`"
+                    },
+                    {
+                      "name": "magnitud_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q1_air_coverage",
+                "query": {
+                  "datasetName": "air_coverage",
+                  "fields": [
+                    {
+                      "name": "magnitud",
+                      "expression": "`magnitud`"
+                    },
+                    {
+                      "name": "magnitud_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "magnitud",
+                    "displayName": "Gas",
+                    "queryName": "q0_air_facts"
+                  },
+                  {
+                    "fieldName": "magnitud",
+                    "displayName": "Gas",
+                    "queryName": "q1_air_coverage"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Gas",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_estacion",
+            "queries": [
+              {
+                "name": "q0_air_facts",
+                "query": {
+                  "datasetName": "air_facts",
+                  "fields": [
+                    {
+                      "name": "nombre_estacion",
+                      "expression": "`nombre_estacion`"
+                    },
+                    {
+                      "name": "nombre_estacion_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q1_air_coverage",
+                "query": {
+                  "datasetName": "air_coverage",
+                  "fields": [
+                    {
+                      "name": "nombre_estacion",
+                      "expression": "`nombre_estacion`"
+                    },
+                    {
+                      "name": "nombre_estacion_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "nombre_estacion",
+                    "displayName": "Estacion",
+                    "queryName": "q0_air_facts"
+                  },
+                  {
+                    "fieldName": "nombre_estacion",
+                    "displayName": "Estacion",
+                    "queryName": "q1_air_coverage"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Estacion",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 1,
+            "width": 3,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "pct_valido",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "air_facts",
+                  "fields": [
+                    {
+                      "name": "pct_valido",
+                      "expression": "SUM(`es_valido`) / COUNT(`validez`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "% lecturas validas",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "pct_valido",
+                  "displayName": "% lecturas validas",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "n_validas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "air_facts",
+                  "fields": [
+                    {
+                      "name": "n_validas",
+                      "expression": "SUM(`es_valido`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Lecturas validas",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "n_validas",
+                  "displayName": "Lecturas validas",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "n_invalidas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "air_facts",
+                  "fields": [
+                    {
+                      "name": "n_invalidas",
+                      "expression": "SUM(`es_invalido`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Medidas invalidas",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "n_invalidas",
+                  "displayName": "Medidas invalidas",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "n_sin_dato",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "air_coverage",
+                  "fields": [
+                    {
+                      "name": "n_sin_dato",
+                      "expression": "SUM(CASE WHEN `estado` = 'sin dato' THEN `dias` ELSE 0 END)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Dias sin dato",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "n_sin_dato",
+                  "displayName": "Dias sin dato",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 2,
+            "width": 3,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "cov_estacion",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "air_coverage",
+                  "fields": [
+                    {
+                      "name": "nombre_estacion",
+                      "expression": "`nombre_estacion`"
+                    },
+                    {
+                      "name": "sum(dias)",
+                      "expression": "SUM(`dias`)"
+                    },
+                    {
+                      "name": "estado",
+                      "expression": "`estado`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Cobertura por estacion (dias)",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "nombre_estacion",
+                  "displayName": "Estacion",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(dias)",
+                  "displayName": "Dias",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "estado",
+                  "displayName": "Estado",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "cov_gas",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "air_coverage",
+                  "fields": [
+                    {
+                      "name": "magnitud",
+                      "expression": "`magnitud`"
+                    },
+                    {
+                      "name": "sum(dias)",
+                      "expression": "SUM(`dias`)"
+                    },
+                    {
+                      "name": "estado",
+                      "expression": "`estado`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Cobertura por gas (dias)",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "magnitud",
+                  "displayName": "Gas",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(dias)",
+                  "displayName": "Dias",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "estado",
+                  "displayName": "Estado",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 5,
+            "width": 6,
+            "height": 7
+          }
+        },
+        {
+          "widget": {
+            "name": "serie_cobertura",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "air_facts",
+                  "fields": [
+                    {
+                      "name": "monthly(fecha)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `fecha`)"
+                    },
+                    {
+                      "name": "sum(es_valido)",
+                      "expression": "SUM(`es_valido`)"
+                    },
+                    {
+                      "name": "sum(es_invalido)",
+                      "expression": "SUM(`es_invalido`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Lecturas por mes: validas vs invalidas",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(fecha)",
+                  "displayName": "Mes",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "fields": [
+                    {
+                      "fieldName": "sum(es_valido)",
+                      "displayName": "Validas"
+                    },
+                    {
+                      "fieldName": "sum(es_invalido)",
+                      "displayName": "Invalidas"
+                    }
+                  ]
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "serie_valor",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "air_facts",
+                  "fields": [
+                    {
+                      "name": "monthly(fecha)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `fecha`)"
+                    },
+                    {
+                      "name": "avg(dato_valido)",
+                      "expression": "AVG(`dato_valido`)"
+                    },
+                    {
+                      "name": "magnitud",
+                      "expression": "`magnitud`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Valor medio del gas por mes",
+                "showTitle": true
+              },
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(fecha)",
+                  "displayName": "Mes",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(dato_valido)",
+                  "displayName": "Valor medio",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "magnitud",
+                  "displayName": "Gas",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 18,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "heat_dia",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "air_facts",
+                  "fields": [
+                    {
+                      "name": "mes",
+                      "expression": "`mes`"
+                    },
+                    {
+                      "name": "nombre_estacion",
+                      "expression": "`nombre_estacion`"
+                    },
+                    {
+                      "name": "cnt",
+                      "expression": "COUNT(`fecha`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Dias con dato por mes y estacion",
+                "showTitle": true
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "mes",
+                  "displayName": "Mes",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "nombre_estacion",
+                  "displayName": "Estacion",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "cnt",
+                  "displayName": "Lecturas",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 24,
+            "width": 12,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    },
+    {
+      "name": "trafico",
+      "displayName": "Trafico",
+      "layout": [
+        {
+          "widget": {
+            "name": "t_tra",
+            "multilineTextboxSpec": {
+              "lines": [
+                "## Trafico"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 12,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_ano_t",
+            "queries": [
+              {
+                "name": "q0_traffic",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "ano",
+                      "expression": "`ano`"
+                    },
+                    {
+                      "name": "ano_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q1_traffic_coverage",
+                "query": {
+                  "datasetName": "traffic_coverage",
+                  "fields": [
+                    {
+                      "name": "ano",
+                      "expression": "`ano`"
+                    },
+                    {
+                      "name": "ano_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "ano",
+                    "displayName": "Ano",
+                    "queryName": "q0_traffic"
+                  },
+                  {
+                    "fieldName": "ano",
+                    "displayName": "Ano",
+                    "queryName": "q1_traffic_coverage"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Ano",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_distrito_t",
+            "queries": [
+              {
+                "name": "q0_traffic",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "distrito_nombre",
+                      "expression": "`distrito_nombre`"
+                    },
+                    {
+                      "name": "distrito_nombre_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q1_traffic_coverage",
+                "query": {
+                  "datasetName": "traffic_coverage",
+                  "fields": [
+                    {
+                      "name": "distrito_nombre",
+                      "expression": "`distrito_nombre`"
+                    },
+                    {
+                      "name": "distrito_nombre_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "distrito_nombre",
+                    "displayName": "Distrito",
+                    "queryName": "q0_traffic"
+                  },
+                  {
+                    "fieldName": "distrito_nombre",
+                    "displayName": "Distrito",
+                    "queryName": "q1_traffic_coverage"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Distrito",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "f_mes_t",
+            "queries": [
+              {
+                "name": "q0_traffic",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "nombre_mes",
+                      "expression": "`nombre_mes`"
+                    },
+                    {
+                      "name": "nombre_mes_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              },
+              {
+                "name": "q1_traffic_coverage",
+                "query": {
+                  "datasetName": "traffic_coverage",
+                  "fields": [
+                    {
+                      "name": "nombre_mes",
+                      "expression": "`nombre_mes`"
+                    },
+                    {
+                      "name": "nombre_mes_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "nombre_mes",
+                    "displayName": "Mes",
+                    "queryName": "q0_traffic"
+                  },
+                  {
+                    "fieldName": "nombre_mes",
+                    "displayName": "Mes",
+                    "queryName": "q1_traffic_coverage"
+                  }
+                ]
+              },
+              "frame": {
+                "title": "Mes",
+                "showTitle": true
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 1,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "pct_ok",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "pct_ok",
+                      "expression": "SUM(`lecturas_ok`) / SUM(`lecturas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "% lecturas sin error",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "pct_ok",
+                  "displayName": "% lecturas sin error",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "n_puntos",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "n_puntos",
+                      "expression": "COUNT(DISTINCT `id`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "Puntos de medida",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "n_puntos",
+                  "displayName": "Puntos de medida",
+                  "format": {
+                    "type": "number-plain"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "pct_dias",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "traffic_coverage",
+                  "fields": [
+                    {
+                      "name": "pct_dias",
+                      "expression": "SUM(`tiene_dato`) / COUNT(`tiene_dato`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "frame": {
+                "title": "% dias con dato",
+                "showTitle": true
+              },
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "pct_dias",
+                  "displayName": "% dias con dato",
+                  "format": {
+                    "type": "number-percent",
+                    "decimalPlaces": {
+                      "type": "exact",
+                      "places": 1
+                    }
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 8,
+            "y": 2,
+            "width": 4,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "trafico_intensidad_distrito",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "distrito_nombre",
+                      "expression": "`distrito_nombre`"
+                    },
+                    {
+                      "name": "avg(intensidad_media)",
+                      "expression": "AVG(`intensidad_media`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Intensidad media",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "distrito_nombre",
+                  "displayName": "Distrito",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(intensidad_media)",
+                  "displayName": "Intensidad media",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "trafico_ocupacion_distrito",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "distrito_nombre",
+                      "expression": "`distrito_nombre`"
+                    },
+                    {
+                      "name": "avg(ocupacion_media)",
+                      "expression": "AVG(`ocupacion_media`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Ocupacion media",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "distrito_nombre",
+                  "displayName": "Distrito",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(ocupacion_media)",
+                  "displayName": "Ocupacion media",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "trafico_carga_distrito",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "distrito_nombre",
+                      "expression": "`distrito_nombre`"
+                    },
+                    {
+                      "name": "avg(carga_media)",
+                      "expression": "AVG(`carga_media`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Carga media",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "distrito_nombre",
+                  "displayName": "Distrito",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(carga_media)",
+                  "displayName": "Carga media",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 6,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "trafico_vmed_distrito",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "distrito_nombre",
+                      "expression": "`distrito_nombre`"
+                    },
+                    {
+                      "name": "avg(vmed_media)",
+                      "expression": "AVG(`vmed_media`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Vmed media",
+                "showTitle": true
+              },
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "distrito_nombre",
+                  "displayName": "Distrito",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "avg(vmed_media)",
+                  "displayName": "Vmed media",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 9,
+            "y": 5,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "lecturas_mes",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "fecha",
+                      "expression": "`fecha`"
+                    },
+                    {
+                      "name": "sum(lecturas)",
+                      "expression": "SUM(`lecturas`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "value": "Lecturas por mes",
+                  "fields": []
+                }
+              },
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "fecha",
+                  "displayName": "Mes",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(lecturas)",
+                  "displayName": "Lecturas",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 12,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "heat_trafico",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "traffic",
+                  "fields": [
+                    {
+                      "name": "nombre_mes",
+                      "expression": "`nombre_mes`"
+                    },
+                    {
+                      "name": "distrito_nombre",
+                      "expression": "`distrito_nombre`"
+                    },
+                    {
+                      "name": "avg(intensidad_media)",
+                      "expression": "AVG(`intensidad_media`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "frame": {
+                "title": "Intensidad media por mes y distrito",
+                "showTitle": true
+              },
+              "widgetType": "heatmap",
+              "encodings": {
+                "x": {
+                  "fieldName": "nombre_mes",
+                  "displayName": "Mes",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "distrito_nombre",
+                  "displayName": "Distrito",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "color": {
+                  "fieldName": "avg(intensidad_media)",
+                  "displayName": "Intensidad media",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "data": {
+                "queryName": "main_query"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 12,
+            "height": 8
+          }
+        }
+      ],
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1"
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "widgetHeaderAlignment": "LEFT"
+    },
+    "applyModeEnabled": false
+  }
+}

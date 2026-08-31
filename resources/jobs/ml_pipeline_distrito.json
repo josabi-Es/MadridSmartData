@@ -1,0 +1,69 @@
+{
+  "email_notifications": {
+    "on_failure": [
+      "formacionjosabi5@gmail.com"
+    ]
+  },
+  "format": "MULTI_TASK",
+  "max_concurrent_runs": 1,
+  "name": "ml-prediccion-distrito-dev",
+  "parameters": [
+    {
+      "default": "dev",
+      "name": "env"
+    },
+    {
+      "default": "no2",
+      "name": "magnitud_target"
+    },
+    {
+      "default": "16",
+      "name": "distrito"
+    }
+  ],
+  "tags": {
+    "env": "dev"
+  },
+  "tasks": [
+    {
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "magnitud_target": "{{job.parameters.magnitud_target}}",
+          "distrito": "{{job.parameters.distrito}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/ml/features/features_gas_distrito",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "features_gas_distrito",
+      "timeout_seconds": 0
+    },
+    {
+      "depends_on": [
+        {
+          "task_key": "features_gas_distrito"
+        }
+      ],
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "magnitud_target": "{{job.parameters.magnitud_target}}",
+          "distrito": "{{job.parameters.distrito}}",
+          "run_id": "{{job.run_id}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/ml/domains/forecast_gas_distrito",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "forecast_gas_distrito",
+      "timeout_seconds": 0
+    }
+  ],
+  "timeout_seconds": 0,
+  "webhook_notifications": {}
+}

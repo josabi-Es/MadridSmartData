@@ -1,0 +1,136 @@
+{
+  "email_notifications": {
+    "no_alert_for_skipped_runs": false,
+    "on_failure": [
+      "formacionjosabi5@gmail.com"
+    ]
+  },
+  "format": "MULTI_TASK",
+  "max_concurrent_runs": 1,
+  "name": "TestBronze",
+  "parameters": [
+    {
+      "default": "dev",
+      "name": "env"
+    },
+    {
+      "default": "2020",
+      "name": "year_start"
+    },
+    {
+      "default": "2026",
+      "name": "year_end"
+    }
+  ],
+  "performance_target": "PERFORMANCE_OPTIMIZED",
+  "tasks": [
+    {
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "run_id": "{{job.run_id}}",
+          "year_end": "{{job.parameters.year_end}}",
+          "year_start": "{{job.parameters.year_start}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/data/bronze/import_aire",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "bronze_aire",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    },
+    {
+      "depends_on": [
+        {
+          "task_key": "bronze_aire"
+        }
+      ],
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "run_id": "{{job.run_id}}",
+          "year_end": "{{job.parameters.year_end}}",
+          "year_start": "{{job.parameters.year_start}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/data/bronze/import_trafico",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "bronze_trafico",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    },
+    {
+      "depends_on": [
+        {
+          "task_key": "bronze_trafico"
+        }
+      ],
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "run_id": "{{job.run_id}}",
+          "year_end": "{{job.parameters.year_end}}",
+          "year_start": "{{job.parameters.year_start}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/data/bronze/import_trafico_puntos_medida",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "bronze_trafico_puntos_medida",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    },
+    {
+      "depends_on": [
+        {
+          "task_key": "bronze_trafico_puntos_medida"
+        }
+      ],
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "run_id": "{{job.run_id}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/data/bronze/import_estaciones_aire",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "bronze_estaciones_aire",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    },
+    {
+      "depends_on": [
+        {
+          "task_key": "bronze_estaciones_aire"
+        }
+      ],
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "run_id": "{{job.run_id}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/data/bronze/import_distritos",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "bronze_distritos",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    }
+  ],
+  "timeout_seconds": 0,
+  "webhook_notifications": {}
+}

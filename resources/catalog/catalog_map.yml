@@ -1,0 +1,707 @@
+dev:
+  bronze:
+    functions: []
+    models: []
+    tables:
+    - aire
+    - distritos
+    - estaciones_aire
+    - trafico
+    - trafico_puntos_medida
+    volumes:
+    - landing
+    - schema
+  default:
+    functions: []
+    models: []
+    tables: []
+    volumes: []
+  gold:
+    functions: []
+    models: []
+    tables:
+    - dim_distrito
+    - dim_estacion_aire
+    - dim_fecha
+    - dim_magnitud
+    - dim_punto_trafico
+    - fact_calidad_aire
+    - fact_trafico
+    - fact_trafico_diario
+    volumes:
+    - assets
+  information_schema:
+    functions: []
+    models: []
+    tables:
+    - abac_policy_definitions
+    - catalog_privileges
+    - catalog_tags
+    - catalogs
+    - check_constraints
+    - column_masks
+    - column_tags
+    - columns
+    - constraint_column_usage
+    - constraint_table_usage
+    - information_schema_catalog_name
+    - key_column_usage
+    - parameters
+    - referential_constraints
+    - routine_columns
+    - routine_privileges
+    - routines
+    - row_filters
+    - schema_privileges
+    - schema_tags
+    - schemata
+    - table_constraints
+    - table_privileges
+    - table_tags
+    - tables
+    - views
+    - volume_privileges
+    - volume_tags
+    - volumes
+    volumes: []
+  infra:
+    functions: []
+    models: []
+    tables:
+    - datasets
+    - error_logs
+    - ingestion_log
+    - origins
+    volumes:
+    - config
+  ml:
+    functions:
+    - no2_16_forecast
+    - no2_d16_forecast
+    - no2_forecast
+    - pm10_forecast
+    models:
+    - no2_16_forecast
+    - no2_d16_forecast
+    - no2_forecast
+    - pm10_forecast
+    tables:
+    - features_no2
+    - features_no2_16
+    - features_no2_d16_7
+    - features_pm10
+    - forecast_no2_7
+    - forecast_no2_d16_7
+    - forecast_pm10_7
+    volumes: []
+  silver:
+    functions: []
+    models: []
+    tables:
+    - aire
+    - estaciones_aire
+    - trafico
+    volumes: []
+pro:
+  bronze:
+    functions: []
+    models: []
+    tables: []
+    volumes: []
+  default:
+    functions: []
+    models: []
+    tables: []
+    volumes: []
+  gold:
+    functions: []
+    models: []
+    tables: []
+    volumes: []
+  information_schema:
+    functions: []
+    models: []
+    tables:
+    - abac_policy_definitions
+    - catalog_privileges
+    - catalog_tags
+    - catalogs
+    - check_constraints
+    - column_masks
+    - column_tags
+    - columns
+    - constraint_column_usage
+    - constraint_table_usage
+    - information_schema_catalog_name
+    - key_column_usage
+    - parameters
+    - referential_constraints
+    - routine_columns
+    - routine_privileges
+    - routines
+    - row_filters
+    - schema_privileges
+    - schema_tags
+    - schemata
+    - table_constraints
+    - table_privileges
+    - table_tags
+    - tables
+    - views
+    - volume_privileges
+    - volume_tags
+    - volumes
+    volumes: []
+  infra:
+    functions: []
+    models: []
+    tables: []
+    volumes:
+    - infrra
+  silver:
+    functions: []
+    models: []
+    tables: []
+    volumes: []
+samples:
+  accuweather:
+    functions: []
+    models: []
+    tables:
+    - forecast_daily_calendar_imperial
+    - forecast_daily_calendar_metric
+    - forecast_daynight_imperial
+    - forecast_daynight_metric
+    - forecast_hourly_imperial
+    - forecast_hourly_metric
+    - historical_daily_calendar_imperial
+    - historical_daily_calendar_metric
+    - historical_daynight_imperial
+    - historical_daynight_metric
+    - historical_hourly_imperial
+    - historical_hourly_metric
+    volumes: []
+  bakehouse:
+    functions: []
+    models: []
+    tables:
+    - media_customer_reviews
+    - media_gold_reviews_chunked
+    - sales_customers
+    - sales_franchises
+    - sales_suppliers
+    - sales_transactions
+    volumes: []
+  databricks:
+    functions: []
+    models: []
+    tables: []
+    volumes:
+    - datasets
+  healthverity:
+    functions: []
+    models: []
+    tables:
+    - claims_sample_synthetic
+    volumes: []
+  information_schema:
+    functions: []
+    models: []
+    tables:
+    - abac_policy_definitions
+    - catalog_privileges
+    - catalog_tags
+    - catalogs
+    - check_constraints
+    - column_masks
+    - column_tags
+    - columns
+    - constraint_column_usage
+    - constraint_table_usage
+    - information_schema_catalog_name
+    - key_column_usage
+    - parameters
+    - referential_constraints
+    - routine_columns
+    - routine_privileges
+    - routines
+    - row_filters
+    - schema_privileges
+    - schema_tags
+    - schemata
+    - table_constraints
+    - table_privileges
+    - table_tags
+    - tables
+    - views
+    - volume_privileges
+    - volume_tags
+    - volumes
+    volumes: []
+  nyctaxi:
+    functions: []
+    models: []
+    tables:
+    - trips
+    volumes: []
+  sec:
+    functions: []
+    models: []
+    tables: []
+    volumes:
+    - contracts
+  tpcds_sf1:
+    functions: []
+    models: []
+    tables:
+    - call_center
+    - catalog_page
+    - catalog_returns
+    - catalog_sales
+    - customer
+    - customer_address
+    - customer_demographics
+    - date_dim
+    - household_demographics
+    - income_band
+    - inventory
+    - item
+    - promotion
+    - reason
+    - ship_mode
+    - store
+    - store_returns
+    - store_sales
+    - time_dim
+    - warehouse
+    - web_page
+    - web_returns
+    - web_sales
+    - web_site
+    volumes: []
+  tpcds_sf1000:
+    functions: []
+    models: []
+    tables:
+    - call_center
+    - catalog_page
+    - catalog_returns
+    - catalog_sales
+    - customer
+    - customer_address
+    - customer_demographics
+    - date_dim
+    - household_demographics
+    - income_band
+    - inventory
+    - item
+    - promotion
+    - reason
+    - ship_mode
+    - store
+    - store_returns
+    - store_sales
+    - time_dim
+    - warehouse
+    - web_page
+    - web_returns
+    - web_sales
+    - web_site
+    volumes: []
+  tpch:
+    functions: []
+    models: []
+    tables:
+    - customer
+    - lineitem
+    - nation
+    - orders
+    - part
+    - partsupp
+    - region
+    - supplier
+    volumes: []
+  wanderbricks:
+    functions: []
+    models: []
+    tables:
+    - amenities
+    - booking_updates
+    - bookings
+    - clickstream
+    - countries
+    - customer_support_logs
+    - destinations
+    - employees
+    - hosts
+    - page_views
+    - payments
+    - properties
+    - property_amenities
+    - property_images
+    - reviews
+    - users
+    volumes: []
+system:
+  access:
+    functions: []
+    models: []
+    tables:
+    - assistant_events
+    - audit
+    - clean_room_events
+    - column_lineage
+    - inbound_network
+    - outbound_network
+    - table_lineage
+    - workspaces_latest
+    volumes: []
+  ai:
+    functions:
+    - ai_analyze_sentiment
+    - ai_classify
+    - ai_extract
+    - ai_fix_grammar
+    - ai_gen
+    - ai_mask
+    - ai_parse_document
+    - ai_prep_search
+    - ai_search
+    - ai_similarity
+    - ai_summarize
+    - ai_translate
+    - python_exec
+    models:
+    - bge_base_en_v1_5
+    - bge_large_en_v1_5
+    - bge_m3
+    - bge_small_en_v1_5
+    - chronos-t5-large
+    - databricks-claude-3-7-sonnet
+    - databricks-claude-fable-5
+    - databricks-claude-haiku-4-5
+    - databricks-claude-opus-4-1
+    - databricks-claude-opus-4-5
+    - databricks-claude-opus-4-6
+    - databricks-claude-opus-4-7
+    - databricks-claude-opus-4-8
+    - databricks-claude-opus-5
+    - databricks-claude-sonnet-4
+    - databricks-claude-sonnet-4-5
+    - databricks-claude-sonnet-4-6
+    - databricks-claude-sonnet-5
+    - databricks-deepseek-v4-flash-0731
+    - databricks-deepseek-v4-pro-0813
+    - databricks-gemini-2-5-flash
+    - databricks-gemini-2-5-pro
+    - databricks-gemini-3-1-flash-image
+    - databricks-gemini-3-1-flash-lite
+    - databricks-gemini-3-1-pro
+    - databricks-gemini-3-5-flash
+    - databricks-gemini-3-5-flash-lite
+    - databricks-gemini-3-6-flash
+    - databricks-gemini-3-7-flash
+    - databricks-gemini-3-flash
+    - databricks-gemini-3-pro
+    - databricks-gemini-3-pro-image
+    - databricks-glm-5-2
+    - databricks-glm-5-3
+    - databricks-glm-5-3-flash
+    - databricks-gpt-5
+    - databricks-gpt-5-1
+    - databricks-gpt-5-1-codex-max
+    - databricks-gpt-5-1-codex-mini
+    - databricks-gpt-5-2
+    - databricks-gpt-5-2-codex
+    - databricks-gpt-5-3-codex
+    - databricks-gpt-5-4
+    - databricks-gpt-5-4-mini
+    - databricks-gpt-5-4-nano
+    - databricks-gpt-5-5
+    - databricks-gpt-5-5-pro
+    - databricks-gpt-5-6-luna
+    - databricks-gpt-5-6-sol
+    - databricks-gpt-5-6-terra
+    - databricks-gpt-5-mini
+    - databricks-gpt-5-nano
+    - databricks-grok-4-6
+    - databricks-inkling
+    - databricks-kimi-k2-7-code
+    - databricks-kimi-k3
+    - databricks-qwen35-122b-a10b
+    - dbrx_base
+    - dbrx_instruct
+    - gemma-3-12b-it
+    - glm-5-2-fast
+    - glm-5-3-flash-fast
+    - gpt-oss-120b
+    - gpt-oss-20b
+    - gte_base_en_v1_5
+    - gte_large_en_v1_5
+    - llama-4-maverick
+    - llama_v3_2_1b
+    - llama_v3_2_1b_instruct
+    - llama_v3_2_3b
+    - llama_v3_2_3b_instruct
+    - llama_v3_3_70b_instruct
+    - llama_v3_flash_preview
+    - meta_llama_3_70b
+    - meta_llama_3_70b_instruct
+    - meta_llama_3_8b
+    - meta_llama_3_8b_instruct
+    - meta_llama_v3_1_405b
+    - meta_llama_v3_1_405b_instruct_fp8
+    - meta_llama_v3_1_70b
+    - meta_llama_v3_1_70b_instruct
+    - meta_llama_v3_1_8b
+    - meta_llama_v3_1_8b_instruct
+    - mistral_7b_instruct_v0_1
+    - mistral_7b_instruct_v0_2
+    - mistral_7b_v0_1
+    - mixtral_8x7b_instruct_v0_1
+    - mixtral_8x7b_v0_1
+    - qwen3-embedding-0-6b
+    - qwen3-next-80b-a3b-instruct
+    - whisper_large_v3
+    tables: []
+    volumes: []
+  ai_gateway:
+    functions: []
+    models: []
+    tables:
+    - external_model_spend
+    - usage
+    volumes: []
+  billing:
+    functions: []
+    models: []
+    tables:
+    - account_prices
+    - attributed_usage
+    - list_prices
+    - usage
+    volumes: []
+  compute:
+    functions: []
+    models: []
+    tables:
+    - clusters
+    - instance_events
+    - instance_pools
+    - node_timeline
+    - node_types
+    - warehouse_events
+    - warehouses
+    volumes: []
+  information_schema:
+    functions: []
+    models: []
+    tables:
+    - abac_policy_definitions
+    - catalog_privileges
+    - catalog_provider_share_usage
+    - catalog_tags
+    - catalogs
+    - check_constraints
+    - column_masks
+    - column_tags
+    - columns
+    - connection_privileges
+    - connections
+    - constraint_column_usage
+    - constraint_table_usage
+    - credential_privileges
+    - credentials
+    - external_location_privileges
+    - external_locations
+    - information_schema_catalog_name
+    - key_column_usage
+    - metastore_privileges
+    - metastores
+    - parameters
+    - providers
+    - recipient_allowed_ip_ranges
+    - recipient_tokens
+    - recipients
+    - referential_constraints
+    - routine_columns
+    - routine_privileges
+    - routines
+    - row_filters
+    - schema_privileges
+    - schema_share_usage
+    - schema_tags
+    - schemata
+    - share_recipient_privileges
+    - shares
+    - storage_credential_privileges
+    - storage_credentials
+    - table_constraints
+    - table_privileges
+    - table_share_usage
+    - table_tags
+    - tables
+    - views
+    - volume_privileges
+    - volume_tags
+    - volumes
+    volumes: []
+  lakeflow:
+    functions: []
+    models: []
+    tables:
+    - job_run_timeline
+    - job_task_run_timeline
+    - job_tasks
+    - jobs
+    - pipeline_update_timeline
+    - pipelines
+    - zerobus_ingest
+    - zerobus_stream
+    volumes: []
+  mlflow:
+    functions: []
+    models: []
+    tables:
+    - experiments_latest
+    - run_metrics_history
+    - runs_latest
+    volumes: []
+  query:
+    functions: []
+    models: []
+    tables:
+    - history
+    volumes: []
+  serving:
+    functions: []
+    models: []
+    tables:
+    - endpoint_usage
+    - served_entities
+    volumes: []
+  storage:
+    functions: []
+    models: []
+    tables:
+    - auto_upgrade_operations_history
+    - predictive_optimization_operations_history
+    - table_metrics_history
+    volumes: []
+workspace:
+  alextheanalyst:
+    functions: []
+    models: []
+    tables:
+    - customerscsv
+    - emissions_data_2023
+    - orderscsv
+    - productscsv
+    volumes:
+    - data
+  default:
+    functions: []
+    models: []
+    tables:
+    - alextheanalyst_data
+    - customersjson
+    volumes:
+    - youtubeseries
+  dev:
+    functions: []
+    models: []
+    tables: []
+    volumes: []
+  information_schema:
+    functions: []
+    models: []
+    tables:
+    - abac_policy_definitions
+    - catalog_privileges
+    - catalog_tags
+    - catalogs
+    - check_constraints
+    - column_masks
+    - column_tags
+    - columns
+    - constraint_column_usage
+    - constraint_table_usage
+    - information_schema_catalog_name
+    - key_column_usage
+    - parameters
+    - referential_constraints
+    - routine_columns
+    - routine_privileges
+    - routines
+    - row_filters
+    - schema_privileges
+    - schema_tags
+    - schemata
+    - table_constraints
+    - table_privileges
+    - table_tags
+    - tables
+    - views
+    - volume_privileges
+    - volume_tags
+    - volumes
+    volumes: []
+yolo:
+  datasets:
+    functions: []
+    models: []
+    tables: []
+    volumes:
+    - tomatoes
+  default:
+    functions: []
+    models: []
+    tables: []
+    volumes: []
+  information_schema:
+    functions: []
+    models: []
+    tables:
+    - abac_policy_definitions
+    - catalog_privileges
+    - catalog_tags
+    - catalogs
+    - check_constraints
+    - column_masks
+    - column_tags
+    - columns
+    - constraint_column_usage
+    - constraint_table_usage
+    - information_schema_catalog_name
+    - key_column_usage
+    - parameters
+    - referential_constraints
+    - routine_columns
+    - routine_privileges
+    - routines
+    - row_filters
+    - schema_privileges
+    - schema_tags
+    - schemata
+    - table_constraints
+    - table_privileges
+    - table_tags
+    - tables
+    - views
+    - volume_privileges
+    - volume_tags
+    - volumes
+    volumes: []
+  infra:
+    functions: []
+    models: []
+    tables:
+    - champions
+    - detections
+    - failures
+    volumes: []
+  models:
+    functions: []
+    models: []
+    tables: []
+    volumes: []

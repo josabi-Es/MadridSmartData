@@ -1,0 +1,71 @@
+{
+  "email_notifications": {
+    "on_failure": [
+      "formacionjosabi5@gmail.com"
+    ]
+  },
+  "format": "MULTI_TASK",
+  "max_concurrent_runs": 1,
+  "name": "TestGold",
+  "parameters": [
+    {
+      "default": "dev",
+      "name": "env"
+    },
+    {
+      "default": "all",
+      "name": "target"
+    },
+    {
+      "default": "2015",
+      "name": "year_start"
+    },
+    {
+      "default": "2030",
+      "name": "year_end"
+    }
+  ],
+  "tasks": [
+    {
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "run_id": "{{job.run_id}}",
+          "target": "{{job.parameters.target}}",
+          "year_end": "{{job.parameters.year_end}}",
+          "year_start": "{{job.parameters.year_start}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/data/gold/dimensions",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "gold_dimensions",
+      "timeout_seconds": 0
+    },
+    {
+      "depends_on": [
+        {
+          "task_key": "gold_dimensions"
+        }
+      ],
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "run_id": "{{job.run_id}}",
+          "target": "{{job.parameters.target}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/data/gold/facts",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "gold_facts",
+      "timeout_seconds": 0
+    }
+  ],
+  "timeout_seconds": 0,
+  "webhook_notifications": {}
+}

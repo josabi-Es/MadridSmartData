@@ -1,0 +1,70 @@
+{
+  "email_notifications": {
+    "no_alert_for_skipped_runs": false,
+    "on_failure": [
+      "formacionjosabi5@gmail.com"
+    ]
+  },
+  "format": "MULTI_TASK",
+  "max_concurrent_runs": 1,
+  "name": "ml-prediccion-dev",
+  "parameters": [
+    {
+      "default": "dev",
+      "name": "env"
+    },
+    {
+      "default": "pm10",
+      "name": "magnitud_target"
+    }
+  ],
+  "performance_target": "PERFORMANCE_OPTIMIZED",
+  "queue": {
+    "enabled": true
+  },
+  "tags": {
+    "env": "dev"
+  },
+  "tasks": [
+    {
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "magnitud_target": "{{job.parameters.magnitud_target}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/ml/features/features_gas",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "features_gas",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    },
+    {
+      "depends_on": [
+        {
+          "task_key": "features_gas"
+        }
+      ],
+      "disabled": false,
+      "email_notifications": {},
+      "notebook_task": {
+        "base_parameters": {
+          "env": "{{job.parameters.env}}",
+          "magnitud_target": "{{job.parameters.magnitud_target}}",
+          "run_id": "{{job.run_id}}"
+        },
+        "notebook_path": "/Workspace/Users/formacionjosabi5@gmail.com/MadridSmartData/src/ml/domains/forecast_gas",
+        "source": "WORKSPACE"
+      },
+      "run_if": "ALL_SUCCESS",
+      "task_key": "forecast_gas",
+      "timeout_seconds": 0,
+      "webhook_notifications": {}
+    }
+  ],
+  "timeout_seconds": 0,
+  "webhook_notifications": {}
+}

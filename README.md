@@ -110,4 +110,5 @@ date needs shared dimensions instead of duplicating them.
 
 ### Demo
 
-Note: Video is being updated. Coming soon.
+<video src="https://github.com/user-attachments/assets/7e563ec5-5943-41ca-a4cc-5a522762dccb" controls width="700"></video>
+

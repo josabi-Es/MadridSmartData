@@ -104,6 +104,6 @@ regular release is created with the same version scheme.
 
 ### Demo
 
-<video src="https://github.com/user-attachments/assets/7035ff6a-8832-433d-9783-efc64b22313b" controls width="700"></video>
+ Note: Video is being updated. Coming soon. al final... ejecutalo como sea mas facil   
 
----
+
